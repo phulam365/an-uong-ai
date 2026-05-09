@@ -1,4 +1,0 @@
-[  381916ms] [LOG] [vite] server connection lost. Polling for restart... @ http://127.0.0.1:8000/:205
-[  382018ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8000/_boost/browser-logs:0
-[  382018ms] [ERROR] Failed to send logs: TypeError: Failed to fetch
-    at flushLogs (http://127.0.0.1:8000/:183:9) @ http://127.0.0.1:8000/:191
