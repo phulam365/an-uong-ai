@@ -16,6 +16,7 @@ class ChatTurnResponder
             'status' => $turn->status,
             'reply' => $turn->reply,
             'cart_actions' => $turn->cart_actions ?? [],
+            'filter_action' => $turn->filter_action,
             'error' => $turn->error,
         ];
     }

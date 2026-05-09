@@ -9,13 +9,13 @@ import { success as orderSuccess } from '@/routes/order';
 
 interface Category {
     key: string;
-    label: string;
+    labels: LocalizedText;
     count: number;
 }
 
 interface PropertyFilter {
     key: string;
-    label: string;
+    labels: LocalizedText;
     count: number;
 }
 
@@ -25,17 +25,18 @@ interface Food {
     vietnamese_name: string | null;
     slug: string;
     category: string;
-    category_label: string;
+    category_labels: LocalizedText;
     ingredients: string;
     vietnamese_description: string | null;
     formatted_price: string;
     price_vnd: number;
     image_url: string;
     property_keys: string[];
-    property_labels: string[];
+    property_labels: LocalizedText[];
 }
 
 interface MenuProps {
+    language?: MenuLanguage;
     categories: Category[];
     propertyFilters: PropertyFilter[];
     foods: Food[];
@@ -52,11 +53,17 @@ interface ChatCartAction {
     quantity_delta: number;
 }
 
+interface ChatFilterAction {
+    category: string;
+    property_keys: string[];
+}
+
 interface ChatTurnResponse {
     turn_id: number;
     status: 'pending' | 'processing' | 'completed' | 'failed';
     reply: string | null;
     cart_actions: ChatCartAction[];
+    filter_action: ChatFilterAction | null;
     error: string | null;
 }
 
@@ -67,8 +74,150 @@ interface ChatMessage {
 }
 
 type MenuLanguage = 'vi' | 'en';
+type LocalizedText = Record<MenuLanguage, string>;
+
+const uiText: Record<
+    MenuLanguage,
+    {
+        pageTitle: string;
+        brandLabel: string;
+        heroTitle: string;
+        openCart: string;
+        openCartWithItems: (count: number) => string;
+        categories: string;
+        filterBy: string;
+        clear: string;
+        clearFilters: string;
+        itemCount: (count: number) => string;
+        emptyTitle: string;
+        emptyBody: string;
+        menuLanguage: string;
+        decreaseQuantity: string;
+        increaseQuantity: string;
+        closeDetails: string;
+        currentOrder: string;
+        cart: string;
+        closeCart: string;
+        unit: string;
+        quantity: string;
+        lineTotal: string;
+        emptyCartTitle: string;
+        emptyCartBody: string;
+        total: string;
+        orderItems: (count: number) => string;
+        chatAssistantLabel: string;
+        chatKicker: string;
+        chatTitle: string;
+        closeChat: string;
+        openChat: string;
+        chatButtonCta: string;
+        sendMessage: string;
+        chatPlaceholder: string;
+        chatTyping: string;
+        chatWelcome: string;
+        chatSessionError: string;
+        chatSendError: string;
+        chatNoResponse: string;
+        chatTimeout: string;
+        chatTimeoutError: string;
+    }
+> = {
+    vi: {
+        pageTitle: 'Thực đơn',
+        brandLabel: 'Thực đơn An Uong AI',
+        heroTitle: 'Món ăn và đồ uống sẵn sàng để chọn',
+        openCart: 'Mở giỏ hàng',
+        openCartWithItems: (count) => `Mở giỏ hàng, ${count} món`,
+        categories: 'Danh mục',
+        filterBy: 'Lọc theo',
+        clear: 'Xóa',
+        clearFilters: 'Xóa bộ lọc',
+        itemCount: (count) => `${count} món`,
+        emptyTitle: 'Không có món phù hợp',
+        emptyBody: 'Thử danh mục khác hoặc bỏ bớt thuộc tính đã chọn.',
+        menuLanguage: 'Ngôn ngữ thực đơn',
+        decreaseQuantity: 'Giảm số lượng',
+        increaseQuantity: 'Tăng số lượng',
+        closeDetails: 'Đóng chi tiết',
+        currentOrder: 'Đơn hiện tại',
+        cart: 'Giỏ hàng',
+        closeCart: 'Đóng giỏ hàng',
+        unit: 'Đơn giá',
+        quantity: 'Số lượng',
+        lineTotal: 'Tạm tính',
+        emptyCartTitle: 'Giỏ hàng đang trống',
+        emptyCartBody: 'Thêm món từ thực đơn để xem tại đây.',
+        total: 'Tổng cộng',
+        orderItems: (count) => `Đặt ${count} món`,
+        chatAssistantLabel: 'Trợ lý gọi món',
+        chatKicker: 'Trò chuyện',
+        chatTitle: 'Trợ lý gọi món',
+        closeChat: 'Đóng trò chuyện',
+        openChat: 'Mở trò chuyện',
+        chatButtonCta: 'Hỏi về món ăn',
+        sendMessage: 'Gửi tin nhắn',
+        chatPlaceholder: 'Nhập món hoặc khẩu vị...',
+        chatTyping: 'Đang trả lời...',
+        chatWelcome:
+            'Bạn muốn ăn gì hôm nay? Mình có thể gợi ý và thêm món vào giỏ.',
+        chatSessionError: 'Mình chưa mở được phiên chat. Vui lòng thử lại.',
+        chatSendError: 'Mình chưa gửi được tin nhắn. Vui lòng thử lại.',
+        chatNoResponse: 'Mình chưa có phản hồi phù hợp.',
+        chatTimeout: 'Mình vẫn đang chờ kết nối trợ lý. Vui lòng thử lại sau.',
+        chatTimeoutError: 'Quá thời gian chờ phản hồi từ trợ lý.',
+    },
+    en: {
+        pageTitle: 'Menu',
+        brandLabel: 'An Uong AI Menu',
+        heroTitle: 'Food and drinks ready to browse',
+        openCart: 'Open cart',
+        openCartWithItems: (count) =>
+            `Open cart, ${count} ${count === 1 ? 'item' : 'items'}`,
+        categories: 'Categories',
+        filterBy: 'Filter by',
+        clear: 'Clear',
+        clearFilters: 'Clear filters',
+        itemCount: (count) => `${count} ${count === 1 ? 'item' : 'items'}`,
+        emptyTitle: 'No matching menu items',
+        emptyBody:
+            'Try a different category or remove one of the selected properties.',
+        menuLanguage: 'Menu language',
+        decreaseQuantity: 'Decrease quantity',
+        increaseQuantity: 'Increase quantity',
+        closeDetails: 'Close details',
+        currentOrder: 'Current order',
+        cart: 'Cart',
+        closeCart: 'Close cart',
+        unit: 'Unit',
+        quantity: 'Quantity',
+        lineTotal: 'Line total',
+        emptyCartTitle: 'Your cart is empty',
+        emptyCartBody: 'Add food from the menu to see it here.',
+        total: 'Total',
+        orderItems: (count) =>
+            `Order ${count} ${count === 1 ? 'item' : 'items'}`,
+        chatAssistantLabel: 'Chat ordering assistant',
+        chatKicker: 'Chat',
+        chatTitle: 'Ordering assistant',
+        closeChat: 'Close chat',
+        openChat: 'Open chat',
+        chatButtonCta: 'Ask about dishes',
+        sendMessage: 'Send message',
+        chatPlaceholder: 'Enter a dish or craving...',
+        chatTyping: 'Replying...',
+        chatWelcome:
+            'What would you like today? I can suggest dishes and add them to your cart.',
+        chatSessionError: 'I could not open the chat session. Please try again.',
+        chatSendError: 'I could not send the message. Please try again.',
+        chatNoResponse: 'I do not have a useful response yet.',
+        chatTimeout:
+            'I am still waiting for the assistant connection. Please try again later.',
+        chatTimeoutError: 'Timed out waiting for the assistant response.',
+    },
+};
 
 export default function Menu({
+    language: initialLanguage = 'vi',
     categories,
     propertyFilters,
     foods,
@@ -80,7 +229,16 @@ export default function Menu({
     const [quantities, setQuantities] = useState<Record<number, number>>({});
     const [selectedFood, setSelectedFood] = useState<Food | null>(null);
     const [isCartOpen, setIsCartOpen] = useState(false);
-    const [language, setLanguage] = useState<MenuLanguage>('vi');
+    const [language, setLanguage] = useState<MenuLanguage>(initialLanguage);
+    const t = uiText[language];
+
+    const changeLanguage = (nextLanguage: MenuLanguage): void => {
+        setLanguage(nextLanguage);
+
+        const url = new URL(window.location.href);
+        url.searchParams.set('language', nextLanguage);
+        window.history.replaceState(window.history.state, '', url);
+    };
 
     const propertyCountsByCategory = useMemo(() => {
         const counts = new Map<string, number>();
@@ -181,31 +339,31 @@ export default function Menu({
 
     return (
         <>
-            <Head title="Menu" />
+            <Head title={t.pageTitle} />
             <main className="min-h-screen bg-paper text-ink">
                 <div className="border-b border-border bg-surface/95 shadow-sm">
                     <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:px-8">
                         <div className="flex items-center justify-between gap-4">
                             <div>
                                 <p className="text-xs font-semibold tracking-[0.18em] text-olive uppercase">
-                                    An Uong AI Menu
+                                    {t.brandLabel}
                                 </p>
                                 <h1 className="mt-1 text-2xl leading-tight font-semibold sm:text-3xl">
-                                    Food and drinks ready to browse
+                                    {t.heroTitle}
                                 </h1>
                             </div>
 
                             <div className="flex shrink-0 items-center gap-2">
                                 <LanguageSwitch
                                     language={language}
-                                    onChange={setLanguage}
+                                    onChange={changeLanguage}
                                 />
                                 <button
                                     type="button"
                                     aria-label={
                                         cartQuantity > 0
-                                            ? `Open cart, ${cartQuantity} items`
-                                            : 'Open cart'
+                                            ? t.openCartWithItems(cartQuantity)
+                                            : t.openCart
                                     }
                                     onClick={() => setIsCartOpen(true)}
                                     className="relative grid h-11 w-11 place-items-center rounded-full border border-border bg-paper text-olive shadow-sm transition hover:-translate-y-0.5 hover:border-brass hover:text-olive-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
@@ -227,6 +385,7 @@ export default function Menu({
                                 <CategoryButton
                                     key={category.key}
                                     category={category}
+                                    language={language}
                                     isActive={activeCategory === category.key}
                                     onClick={() =>
                                         setActiveCategory(category.key)
@@ -241,6 +400,7 @@ export default function Menu({
                                     <PropertyFilterButton
                                         key={filter.key}
                                         filter={filter}
+                                        language={language}
                                         count={
                                             propertyCountsByCategory.get(
                                                 filter.key,
@@ -262,13 +422,14 @@ export default function Menu({
                 <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:px-8">
                     <aside className="sticky top-6 hidden h-fit rounded-lg border border-border bg-surface p-3 shadow-sm lg:block">
                         <p className="mb-3 px-2 text-xs font-semibold tracking-[0.16em] text-olive uppercase">
-                            Categories
+                            {t.categories}
                         </p>
                         <div className="flex flex-col gap-2">
                             {categories.map((category) => (
                                 <CategoryButton
                                     key={category.key}
                                     category={category}
+                                    language={language}
                                     isActive={activeCategory === category.key}
                                     onClick={() =>
                                         setActiveCategory(category.key)
@@ -282,7 +443,7 @@ export default function Menu({
                                 <div className="my-4 border-t border-border" />
                                 <div className="flex items-center justify-between gap-3 px-2">
                                     <p className="text-xs font-semibold tracking-[0.16em] text-olive uppercase">
-                                        Filter by
+                                        {t.filterBy}
                                     </p>
                                     {activePropertyKeys.length > 0 ? (
                                         <button
@@ -292,7 +453,7 @@ export default function Menu({
                                             }
                                             className="text-xs font-semibold text-wine transition hover:text-wine-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
                                         >
-                                            Clear
+                                            {t.clear}
                                         </button>
                                     ) : null}
                                 </div>
@@ -301,6 +462,7 @@ export default function Menu({
                                         <PropertyFilterButton
                                             key={filter.key}
                                             filter={filter}
+                                            language={language}
                                             count={
                                                 propertyCountsByCategory.get(
                                                     filter.key,
@@ -322,8 +484,7 @@ export default function Menu({
                     <div className="flex flex-col gap-4">
                         <div className="flex items-center justify-between gap-3">
                             <p className="text-sm font-semibold text-muted">
-                                {visibleFoods.length}{' '}
-                                {visibleFoods.length === 1 ? 'item' : 'items'}
+                                {t.itemCount(visibleFoods.length)}
                             </p>
                             {activePropertyKeys.length > 0 ? (
                                 <button
@@ -331,7 +492,7 @@ export default function Menu({
                                     onClick={() => setActivePropertyKeys([])}
                                     className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-wine shadow-sm transition hover:border-wine hover:text-wine-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none lg:hidden"
                                 >
-                                    Clear filters
+                                    {t.clearFilters}
                                 </button>
                             ) : null}
                         </div>
@@ -357,11 +518,10 @@ export default function Menu({
                         ) : (
                             <section className="rounded-lg border border-border bg-surface px-5 py-12 text-center shadow-sm">
                                 <p className="text-base font-semibold">
-                                    No matching menu items
+                                    {t.emptyTitle}
                                 </p>
                                 <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted">
-                                    Try a different category or remove one of
-                                    the selected properties.
+                                    {t.emptyBody}
                                 </p>
                             </section>
                         )}
@@ -394,10 +554,16 @@ export default function Menu({
 
             <MenuChat
                 quantities={quantities}
+                activeCategory={activeCategory}
+                activePropertyKeys={activePropertyKeys}
                 language={language}
                 onCartAction={(foodId, quantityDelta) =>
                     updateQuantity(foodId, quantityDelta)
                 }
+                onFilterAction={(filterAction) => {
+                    setActiveCategory(filterAction.category);
+                    setActivePropertyKeys(filterAction.property_keys);
+                }}
             />
         </>
     );
@@ -405,25 +571,26 @@ export default function Menu({
 
 function MenuChat({
     quantities,
+    activeCategory,
+    activePropertyKeys,
     language,
     onCartAction,
+    onFilterAction,
 }: {
     quantities: Record<number, number>;
+    activeCategory: string;
+    activePropertyKeys: string[];
     language: MenuLanguage;
     onCartAction: (foodId: number, quantityDelta: number) => void;
+    onFilterAction: (filterAction: ChatFilterAction) => void;
 }) {
+    const t = uiText[language];
     const [isOpen, setIsOpen] = useState(false);
     const hasBootstrappedSession = useRef(false);
-    const sessionLanguage = useRef<MenuLanguage | null>(null);
-    const [isSessionReady, setIsSessionReady] = useState(false);
     const [input, setInput] = useState('');
     const [isSending, setIsSending] = useState(false);
-    const [messages, setMessages] = useState<ChatMessage[]>([
-        {
-            id: 'welcome',
-            role: 'assistant',
-            text: 'Bạn muốn ăn gì hôm nay? Mình có thể gợi ý và thêm món vào giỏ.',
-        },
+    const [messages, setMessages] = useState<ChatMessage[]>(() => [
+        welcomeChatMessage(language),
     ]);
 
     useEffect(() => {
@@ -433,44 +600,18 @@ function MenuChat({
 
         hasBootstrappedSession.current = true;
 
-        const requestedLanguage = language;
-
-        void postJson(ChatSessionController.url(), {
-            language: requestedLanguage,
-        })
-            .then(() => {
-                sessionLanguage.current = requestedLanguage;
-                setIsSessionReady(true);
-            })
+        void postJson(ChatSessionController.url())
             .catch(() => {
                 setMessages((current) => [
                     ...current,
                     {
                         id: createMessageId(),
                         role: 'assistant',
-                        text: 'Mình chưa mở được phiên chat. Vui lòng thử lại.',
+                        text: t.chatSessionError,
                     },
                 ]);
             });
-    }, [isOpen, language]);
-
-    useEffect(() => {
-        if (!isSessionReady || sessionLanguage.current === language) {
-            return;
-        }
-
-        const requestedLanguage = language;
-
-        void postJson(ChatSessionController.url(), {
-            language: requestedLanguage,
-        })
-            .then(() => {
-                sessionLanguage.current = requestedLanguage;
-            })
-            .catch(() => {
-                // Keep the menu responsive if a later language resync fails.
-            });
-    }, [isSessionReady, language]);
+    }, [isOpen, t.chatSessionError]);
 
     const submitMessage = async (): Promise<void> => {
         const message = input.trim();
@@ -496,7 +637,10 @@ function MenuChat({
                 {
                     message,
                     cart: cartPayload(quantities),
-                    language,
+                    filter_context: filterContextPayload(
+                        activeCategory,
+                        activePropertyKeys,
+                    ),
                 },
             );
 
@@ -507,7 +651,7 @@ function MenuChat({
                 {
                     id: createMessageId(),
                     role: 'assistant',
-                    text: 'Mình chưa gửi được tin nhắn. Vui lòng thử lại.',
+                    text: t.chatSendError,
                 },
             ]);
         } finally {
@@ -519,7 +663,7 @@ function MenuChat({
         response: ChatTurnResponse,
     ): Promise<void> => {
         if (response.status === 'pending' || response.status === 'processing') {
-            const completedResponse = await pollTurn(response.turn_id);
+            const completedResponse = await pollTurn(response.turn_id, language);
             applyChatResponse(completedResponse);
 
             return;
@@ -537,34 +681,38 @@ function MenuChat({
                 text:
                     response.reply ||
                     response.error ||
-                    'Mình chưa có phản hồi phù hợp.',
+                    t.chatNoResponse,
             },
         ]);
 
         response.cart_actions.forEach((action) => {
             onCartAction(action.food_id, action.quantity_delta);
         });
+
+        if (response.filter_action) {
+            onFilterAction(response.filter_action);
+        }
     };
 
     return (
         <div className="fixed right-4 bottom-4 z-40 flex flex-col items-end gap-3">
             {isOpen ? (
                 <section
-                    aria-label="Chat ordering assistant"
+                    aria-label={t.chatAssistantLabel}
                     className="flex h-[520px] max-h-[calc(100vh-7rem)] w-[calc(100vw-2rem)] max-w-[380px] flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-2xl"
                 >
                     <div className="flex items-center justify-between gap-3 border-b border-border bg-paper px-4 py-3">
                         <div className="min-w-0">
                             <p className="text-xs font-semibold tracking-[0.16em] text-olive uppercase">
-                                Chat
+                                {t.chatKicker}
                             </p>
                             <h2 className="truncate text-base font-semibold">
-                                Trợ lý gọi món
+                                {t.chatTitle}
                             </h2>
                         </div>
                         <button
                             type="button"
-                            aria-label="Close chat"
+                            aria-label={t.closeChat}
                             onClick={() => setIsOpen(false)}
                             className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border bg-surface text-olive transition hover:border-brass hover:text-wine focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
                         >
@@ -587,7 +735,7 @@ function MenuChat({
                         ))}
                         {isSending ? (
                             <div className="mr-auto rounded-lg border border-border bg-paper px-3 py-2 text-sm text-muted">
-                                Đang trả lời...
+                                {t.chatTyping}
                             </div>
                         ) : null}
                     </div>
@@ -605,12 +753,12 @@ function MenuChat({
                                 onChange={(event) =>
                                     setInput(event.target.value)
                                 }
-                                placeholder="Nhập món hoặc khẩu vị..."
+                                placeholder={t.chatPlaceholder}
                                 className="h-11 min-w-0 rounded-full border border-border bg-surface px-4 text-sm transition outline-none placeholder:text-muted focus:border-olive focus:ring-4 focus:ring-wine/20"
                             />
                             <button
                                 type="submit"
-                                aria-label="Send message"
+                                aria-label={t.sendMessage}
                                 disabled={isSending || input.trim() === ''}
                                 className="grid h-11 w-11 place-items-center rounded-full border border-olive bg-olive text-white shadow-sm transition hover:bg-olive-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:border-border disabled:bg-border"
                             >
@@ -623,11 +771,20 @@ function MenuChat({
 
             <button
                 type="button"
-                aria-label={isOpen ? 'Close chat' : 'Open chat'}
+                aria-label={isOpen ? t.closeChat : t.openChat}
                 onClick={() => setIsOpen((current) => !current)}
-                className="grid h-14 w-14 place-items-center rounded-full border border-olive bg-olive text-white shadow-xl transition hover:-translate-y-0.5 hover:bg-olive-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
+                className="relative inline-flex h-14 max-w-[calc(100vw-2rem)] items-center gap-2 rounded-full border border-orange-600 bg-orange-500 px-4 text-white shadow-xl transition hover:-translate-y-0.5 hover:border-orange-700 hover:bg-orange-600 focus-visible:ring-4 focus-visible:ring-orange-500/25 focus-visible:outline-none"
             >
-                {isOpen ? <CloseIcon /> : <ChatIcon />}
+                <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 rounded-full border border-orange-300 motion-safe:animate-ping"
+                />
+                <span className="relative grid h-6 w-6 shrink-0 place-items-center">
+                    {isOpen ? <CloseIcon /> : <ChatIcon />}
+                </span>
+                <span className="relative whitespace-nowrap text-sm font-semibold">
+                    {t.chatButtonCta}
+                </span>
             </button>
         </div>
     );
@@ -640,9 +797,11 @@ function LanguageSwitch({
     language: MenuLanguage;
     onChange: (language: MenuLanguage) => void;
 }) {
+    const t = uiText[language];
+
     return (
         <div
-            aria-label="Menu language"
+            aria-label={t.menuLanguage}
             className="grid h-11 grid-cols-2 overflow-hidden rounded-full border border-border bg-paper p-1 shadow-sm"
             role="group"
         >
@@ -667,10 +826,12 @@ function LanguageSwitch({
 
 function CategoryButton({
     category,
+    language,
     isActive,
     onClick,
 }: {
     category: Category;
+    language: MenuLanguage;
     isActive: boolean;
     onClick: () => void;
 }) {
@@ -685,7 +846,7 @@ function CategoryButton({
                     : 'border-border bg-paper text-ink hover:border-brass hover:bg-surface'
             }`}
         >
-            <span>{category.label}</span>
+            <span>{localizedText(category.labels, language)}</span>
             <span
                 className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                     isActive ? 'bg-brass text-ink' : 'bg-surface text-wine'
@@ -699,11 +860,13 @@ function CategoryButton({
 
 function PropertyFilterButton({
     filter,
+    language,
     count,
     isActive,
     onClick,
 }: {
     filter: PropertyFilter;
+    language: MenuLanguage;
     count: number;
     isActive: boolean;
     onClick: () => void;
@@ -722,7 +885,7 @@ function PropertyFilterButton({
                     : 'border-border bg-paper text-ink hover:border-brass hover:bg-surface'
             }`}
         >
-            <span>{filter.label}</span>
+            <span>{localizedText(filter.labels, language)}</span>
             <span
                 className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                     isActive ? 'bg-brass text-ink' : 'bg-surface text-wine'
@@ -773,7 +936,7 @@ function ProductCard({
                     loading="lazy"
                 />
                 <span className="absolute top-3 left-3 rounded-full border border-white/70 bg-surface/95 px-3 py-1 text-xs font-semibold text-olive shadow-sm backdrop-blur-sm">
-                    {food.category_label}
+                    {localizedText(food.category_labels, language)}
                 </span>
             </div>
 
@@ -787,12 +950,12 @@ function ProductCard({
                     </p>
                     {food.property_labels.length > 0 ? (
                         <div className="flex flex-wrap gap-1.5">
-                            {food.property_labels.slice(0, 3).map((label) => (
+                            {food.property_labels.slice(0, 3).map((labels) => (
                                 <span
-                                    key={label}
+                                    key={localizedText(labels, 'en')}
                                     className="rounded-full border border-border bg-paper px-2 py-0.5 text-[11px] leading-5 font-semibold text-olive"
                                 >
-                                    {label}
+                                    {localizedText(labels, language)}
                                 </span>
                             ))}
                         </div>
@@ -806,6 +969,7 @@ function ProductCard({
                 </div>
 
                 <QuantityStepper
+                    language={language}
                     quantity={quantity}
                     onIncrement={onIncrement}
                     onDecrement={onDecrement}
@@ -816,19 +980,23 @@ function ProductCard({
 }
 
 function QuantityStepper({
+    language,
     quantity,
     onIncrement,
     onDecrement,
 }: {
+    language: MenuLanguage;
     quantity: number;
     onIncrement: () => void;
     onDecrement: () => void;
 }) {
+    const t = uiText[language];
+
     return (
         <div className="grid h-11 grid-cols-[44px_1fr_44px] overflow-hidden rounded-full border border-border bg-paper">
             <button
                 type="button"
-                aria-label="Decrease quantity"
+                aria-label={t.decreaseQuantity}
                 disabled={quantity === 0}
                 onClick={(event) => {
                     event.stopPropagation();
@@ -843,7 +1011,7 @@ function QuantityStepper({
             </div>
             <button
                 type="button"
-                aria-label="Increase quantity"
+                aria-label={t.increaseQuantity}
                 onClick={(event) => {
                     event.stopPropagation();
                     onIncrement();
@@ -873,6 +1041,7 @@ function ProductModal({
 }) {
     const foodName = getFoodName(food, language);
     const foodDescription = getFoodDescription(food, language);
+    const t = uiText[language];
 
     return (
         <div
@@ -899,7 +1068,7 @@ function ProductModal({
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="text-xs font-semibold tracking-[0.16em] text-olive uppercase">
-                                {food.category_label}
+                                {localizedText(food.category_labels, language)}
                             </p>
                             <h2
                                 id="product-modal-title"
@@ -910,7 +1079,7 @@ function ProductModal({
                         </div>
                         <button
                             type="button"
-                            aria-label="Close details"
+                            aria-label={t.closeDetails}
                             onClick={onClose}
                             className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border bg-paper text-olive transition hover:border-brass hover:text-wine focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
                         >
@@ -922,12 +1091,12 @@ function ProductModal({
 
                     {food.property_labels.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
-                            {food.property_labels.map((label) => (
+                            {food.property_labels.map((labels) => (
                                 <span
-                                    key={label}
+                                    key={localizedText(labels, 'en')}
                                     className="rounded-full border border-border bg-paper px-3 py-1 text-xs font-semibold text-olive"
                                 >
-                                    {label}
+                                    {localizedText(labels, language)}
                                 </span>
                             ))}
                         </div>
@@ -938,6 +1107,7 @@ function ProductModal({
                             {food.formatted_price}
                         </div>
                         <QuantityStepper
+                            language={language}
                             quantity={quantity}
                             onIncrement={onIncrement}
                             onDecrement={onDecrement}
@@ -966,6 +1136,8 @@ function CartDrawer({
     onIncrement: (foodId: number) => void;
     onDecrement: (foodId: number) => void;
 }) {
+    const t = uiText[language];
+
     return (
         <div
             role="presentation"
@@ -982,18 +1154,18 @@ function CartDrawer({
                 <div className="flex items-start justify-between gap-4 border-b border-border bg-paper p-4">
                     <div>
                         <p className="text-xs font-semibold tracking-[0.16em] text-olive uppercase">
-                            Current order
+                            {t.currentOrder}
                         </p>
                         <h2
                             id="cart-drawer-title"
                             className="mt-1 text-2xl leading-tight font-semibold"
                         >
-                            Cart
+                            {t.cart}
                         </h2>
                     </div>
                     <button
                         type="button"
-                        aria-label="Close cart"
+                        aria-label={t.closeCart}
                         onClick={onClose}
                         className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border bg-surface text-olive transition hover:border-brass hover:text-wine focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
                     >
@@ -1015,7 +1187,7 @@ function CartDrawer({
                                                 {getFoodName(food, language)}
                                             </h3>
                                             <p className="mt-1 text-xs font-semibold text-olive">
-                                                Unit: {food.formatted_price}
+                                                {t.unit}: {food.formatted_price}
                                             </p>
                                         </div>
                                         <p className="shrink-0 text-sm font-semibold text-wine">
@@ -1027,6 +1199,7 @@ function CartDrawer({
 
                                     <div className="mt-3 grid gap-2">
                                         <QuantityStepper
+                                            language={language}
                                             quantity={quantity}
                                             onIncrement={() =>
                                                 onIncrement(food.id)
@@ -1036,9 +1209,11 @@ function CartDrawer({
                                             }
                                         />
                                         <div className="flex items-center justify-between gap-3 text-xs font-semibold text-muted">
-                                            <span>Quantity: {quantity}</span>
                                             <span>
-                                                Line total:{' '}
+                                                {t.quantity}: {quantity}
+                                            </span>
+                                            <span>
+                                                {t.lineTotal}:{' '}
                                                 {formatVnd(
                                                     food.price_vnd * quantity,
                                                 )}
@@ -1056,10 +1231,10 @@ function CartDrawer({
                                 <CartIcon />
                             </div>
                             <p className="mt-4 text-lg font-semibold">
-                                Your cart is empty
+                                {t.emptyCartTitle}
                             </p>
                             <p className="mt-2 text-sm leading-5 text-muted">
-                                Add foods from the menu to see them here.
+                                {t.emptyCartBody}
                             </p>
                         </div>
                     </div>
@@ -1068,7 +1243,7 @@ function CartDrawer({
                 <div className="border-t border-border bg-paper p-4">
                     <div className="flex items-center justify-between gap-4">
                         <span className="text-sm font-semibold tracking-[0.14em] text-olive uppercase">
-                            Total
+                            {t.total}
                         </span>
                         <span className="text-xl font-semibold text-wine">
                             {formatVnd(totalVnd)}
@@ -1076,11 +1251,12 @@ function CartDrawer({
                     </div>
                     {items.length > 0 ? (
                         <Link
-                            href={orderSuccess.url()}
+                            href={orderSuccess.url({
+                                query: { language },
+                            })}
                             className="mt-4 flex h-12 items-center justify-center rounded-full border border-wine bg-wine px-5 text-sm font-semibold text-white shadow-sm transition hover:border-wine-dark hover:bg-wine-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
                         >
-                            Order {cartQuantity} item
-                            {cartQuantity === 1 ? '' : 's'}
+                            {t.orderItems(cartQuantity)}
                         </Link>
                     ) : null}
                 </div>
@@ -1177,6 +1353,18 @@ function getFoodDescription(food: Food, language: MenuLanguage): string {
     return food.vietnamese_description || food.ingredients;
 }
 
+function localizedText(labels: LocalizedText, language: MenuLanguage): string {
+    return labels[language] || labels.en;
+}
+
+function welcomeChatMessage(language: MenuLanguage): ChatMessage {
+    return {
+        id: `welcome-${language}`,
+        role: 'assistant',
+        text: uiText[language].chatWelcome,
+    };
+}
+
 function formatVnd(value: number): string {
     return new Intl.NumberFormat('vi-VN', {
         currency: 'VND',
@@ -1194,7 +1382,20 @@ function cartPayload(quantities: Record<number, number>) {
         .filter((item) => item.quantity > 0);
 }
 
-async function pollTurn(turnId: number): Promise<ChatTurnResponse> {
+function filterContextPayload(
+    activeCategory: string,
+    activePropertyKeys: string[],
+) {
+    return {
+        category: activeCategory,
+        property_keys: activePropertyKeys,
+    };
+}
+
+async function pollTurn(
+    turnId: number,
+    language: MenuLanguage,
+): Promise<ChatTurnResponse> {
     const deadline = Date.now() + 45_000;
 
     while (Date.now() < deadline) {
@@ -1212,9 +1413,10 @@ async function pollTurn(turnId: number): Promise<ChatTurnResponse> {
     return {
         turn_id: turnId,
         status: 'failed',
-        reply: 'Mình vẫn đang chờ kết nối trợ lý. Vui lòng thử lại sau.',
+        reply: uiText[language].chatTimeout,
         cart_actions: [],
-        error: 'Timed out waiting for chat turn.',
+        filter_action: null,
+        error: uiText[language].chatTimeoutError,
     };
 }
 

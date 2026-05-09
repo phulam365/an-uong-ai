@@ -13,9 +13,8 @@ class ChatMessageController extends Controller
 {
     public function store(StoreChatMessageRequest $request, ChatTurnResponder $responder): JsonResponse
     {
-        /** @var array{message: string, cart?: array<int, array{food_id: int, quantity: int}>} $validated */
+        /** @var array{message: string, cart?: array<int, array{food_id: int, quantity: int}>, filter_context?: array{category: string, property_keys?: array<int, string>}} $validated */
         $validated = $request->validated();
-        $language = $this->normalizeLanguage($validated['language'] ?? null);
 
         $chatSession = ChatSession::query()->firstOrCreate(
             ['laravel_session_id' => $request->session()->getId()],
@@ -25,28 +24,17 @@ class ChatMessageController extends Controller
             ],
         );
 
-        $currentLanguage = $this->normalizeLanguage($chatSession->metadata['language'] ?? null);
-        $metadata = is_array($chatSession->metadata) ? $chatSession->metadata : [];
-
         $chatSession->forceFill([
             'last_used_at' => now(),
-            'metadata' => [
-                ...$metadata,
-                'language' => $language,
-            ],
-        ]);
-
-        if ($currentLanguage !== $language && $chatSession->acp_session_id !== null) {
-            $chatSession->acp_session_id = null;
-        }
-
-        $chatSession->save();
+        ])->save();
 
         $turn = $chatSession->turns()->create([
             'status' => 'pending',
             'user_message' => $validated['message'],
             'cart_context' => $validated['cart'] ?? [],
+            'filter_context' => $validated['filter_context'] ?? null,
             'cart_actions' => [],
+            'filter_action' => null,
         ]);
 
         $turn = $this->waitForTurn($turn);
@@ -79,10 +67,5 @@ class ChatMessageController extends Controller
         } while (microtime(true) < $deadline);
 
         return $turn->refresh();
-    }
-
-    private function normalizeLanguage(?string $language): string
-    {
-        return $language === 'en' ? 'en' : 'vi';
     }
 }

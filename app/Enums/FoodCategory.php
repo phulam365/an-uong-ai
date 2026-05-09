@@ -21,4 +21,15 @@ enum FoodCategory: string implements HasLabel
             self::Drink => 'Drink',
         };
     }
+
+    /**
+     * @return array{en: string, vi: string}
+     */
+    public function labels(): array
+    {
+        return match ($this) {
+            self::Food => ['en' => 'Food', 'vi' => 'Món ăn'],
+            self::Drink => ['en' => 'Drink', 'vi' => 'Đồ uống'],
+        };
+    }
 }

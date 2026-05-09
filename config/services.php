@@ -39,6 +39,8 @@ return [
         'binary' => env('CODEX_ACP_BINARY', base_path('node_modules/.bin/codex-acp')),
         'codex_api_key' => env('CODEX_API_KEY'),
         'openai_api_key' => env('OPENAI_API_KEY'),
+        'model' => env('CODEX_ACP_MODEL', 'gpt-5.3-codex-spark'),
+        'reasoning_effort' => env('CODEX_ACP_REASONING_EFFORT', 'low'),
     ],
 
 ];

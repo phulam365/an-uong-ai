@@ -3,33 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Enums\FoodCategory;
+use App\MenuFilterDefinitions;
 use App\Models\Food;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class MenuController extends Controller
 {
-    /**
-     * @var array<int, array{key: string, label: string}>
-     */
-    private const PROPERTY_FILTERS = [
-        ['key' => 'vegetarian', 'label' => 'Vegetarian'],
-        ['key' => 'tourist_favorite', 'label' => 'Tourist favorite'],
-        ['key' => 'adventurous', 'label' => 'Adventurous'],
-        ['key' => 'healthy', 'label' => 'Healthy'],
-        ['key' => 'quick_meal', 'label' => 'Quick meal'],
-        ['key' => 'heavy_meal', 'label' => 'Heavy meal'],
-        ['key' => 'shareable', 'label' => 'Shareable'],
-        ['key' => 'contains_pork', 'label' => 'Pork'],
-        ['key' => 'contains_beef', 'label' => 'Beef'],
-        ['key' => 'contains_seafood', 'label' => 'Seafood'],
-        ['key' => 'contains_nuts', 'label' => 'Nuts'],
-        ['key' => 'contains_dairy', 'label' => 'Dairy'],
-    ];
-
-    public function __invoke(): Response
+    public function __invoke(Request $request): Response
     {
+        $language = $request->string('language')->toString() === 'en' ? 'en' : 'vi';
         $foods = Food::query()
             ->availableForMenu()
             ->get();
@@ -39,14 +24,15 @@ class MenuController extends Controller
         );
 
         return Inertia::render('menu', [
+            'language' => $language,
             'categories' => collect(FoodCategory::cases())
                 ->map(fn (FoodCategory $category): array => [
                     'key' => $category->value,
-                    'label' => $category->label(),
+                    'labels' => $category->labels(),
                     'count' => $counts->get($category->value, 0),
                 ])
                 ->values(),
-            'propertyFilters' => collect(self::PROPERTY_FILTERS)
+            'propertyFilters' => collect(MenuFilterDefinitions::propertyFilters())
                 ->map(fn (array $filter): array => [
                     ...$filter,
                     'count' => $foods->filter(
@@ -62,7 +48,7 @@ class MenuController extends Controller
                     'vietnamese_name' => $food->vietnamese_name,
                     'slug' => $food->slug,
                     'category' => $food->category->value,
-                    'category_label' => $food->category->label(),
+                    'category_labels' => $food->category->labels(),
                     'ingredients' => $food->ingredients ?? '',
                     'vietnamese_description' => $food->vietnamese_description,
                     'formatted_price' => number_format($food->price_vnd).' VND',
@@ -80,7 +66,7 @@ class MenuController extends Controller
      */
     private function propertyKeysFor(Food $food): array
     {
-        return collect(self::PROPERTY_FILTERS)
+        return collect(MenuFilterDefinitions::propertyFilters())
             ->filter(fn (array $filter): bool => (bool) $food->getAttribute($filter['key']))
             ->pluck('key')
             ->values()
@@ -88,13 +74,13 @@ class MenuController extends Controller
     }
 
     /**
-     * @return array<int, string>
+     * @return array<int, array{en: string, vi: string}>
      */
     private function propertyLabelsFor(Food $food): array
     {
-        return collect(self::PROPERTY_FILTERS)
+        return collect(MenuFilterDefinitions::propertyFilters())
             ->filter(fn (array $filter): bool => (bool) $food->getAttribute($filter['key']))
-            ->pluck('label')
+            ->pluck('labels')
             ->values()
             ->all();
     }

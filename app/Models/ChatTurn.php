@@ -14,8 +14,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'status',
     'user_message',
     'cart_context',
+    'filter_context',
     'reply',
     'cart_actions',
+    'filter_action',
     'raw_response',
     'error',
     'completed_at',
@@ -53,7 +55,9 @@ class ChatTurn extends Model
     {
         return [
             'cart_context' => 'array',
+            'filter_context' => 'array',
             'cart_actions' => 'array',
+            'filter_action' => 'array',
             'raw_response' => 'array',
             'completed_at' => 'datetime',
         ];

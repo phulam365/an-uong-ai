@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\MenuFilterDefinitions;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreChatMessageRequest extends FormRequest
 {
@@ -24,10 +26,13 @@ class StoreChatMessageRequest extends FormRequest
     {
         return [
             'message' => ['required', 'string', 'max:1000'],
-            'language' => ['sometimes', 'string', 'in:vi,en'],
             'cart' => ['array', 'max:100'],
             'cart.*.food_id' => ['required', 'integer', 'exists:foods,id'],
             'cart.*.quantity' => ['required', 'integer', 'min:1', 'max:99'],
+            'filter_context' => ['sometimes', 'array'],
+            'filter_context.category' => ['required_with:filter_context', 'string', Rule::in(MenuFilterDefinitions::categoryKeys())],
+            'filter_context.property_keys' => ['sometimes', 'array', 'max:15'],
+            'filter_context.property_keys.*' => ['string', Rule::in(MenuFilterDefinitions::propertyKeys())],
         ];
     }
 }

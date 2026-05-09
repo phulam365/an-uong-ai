@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\MenuFilterDefinitions;
 use App\Models\ChatSession;
 use App\Models\ChatTurn;
 use App\Models\Food;
@@ -67,8 +68,9 @@ class ChatAcpBridge extends Command
             } catch (Throwable $exception) {
                 $turn->forceFill([
                     'status' => 'failed',
-                    'reply' => 'Mình chưa kết nối được trợ lý gọi món. Vui lòng thử lại sau.',
+                    'reply' => $this->fallbackConnectionReply($turn),
                     'cart_actions' => [],
+                    'filter_action' => null,
                     'error' => $exception->getMessage(),
                     'completed_at' => now(),
                 ])->save();
@@ -88,21 +90,23 @@ class ChatAcpBridge extends Command
         $turn->forceFill(['status' => 'processing'])->save();
 
         $chatSession = $turn->chatSession()->firstOrFail();
-        $language = $this->resolveChatLanguage($chatSession);
         $acpSessionId = $this->ensureAcpSession($chatSession);
+        $replyLanguage = $this->detectMessageLanguage($turn->user_message);
 
         $responseText = $this->prompt(
             $acpSessionId,
-            $this->buildTurnPrompt($turn, $language),
+            $this->buildTurnPrompt($turn),
             (int) $this->option('turn-timeout'),
         );
-        $rawResponse = $this->decodeJsonEnvelope($responseText, $language);
+        $rawResponse = $this->decodeJsonEnvelope($responseText, $replyLanguage);
         $cartActions = $this->validatedCartActions($rawResponse['cart_actions'] ?? []);
+        $filterAction = $this->validatedFilterAction($rawResponse['filter_action'] ?? null);
 
         $turn->forceFill([
             'status' => 'completed',
-            'reply' => $this->normalizedReply($rawResponse, $responseText, $language),
+            'reply' => $this->normalizedReply($rawResponse, $responseText, $replyLanguage),
             'cart_actions' => $cartActions,
+            'filter_action' => $filterAction,
             'raw_response' => $rawResponse,
             'error' => null,
             'completed_at' => now(),
@@ -160,7 +164,7 @@ class ChatAcpBridge extends Command
         $this->setReadOnlyMode($acpSessionId);
         $this->prompt(
             $acpSessionId,
-            $this->buildWarmPrompt($chatSession),
+            $this->buildWarmPrompt(),
             (int) $this->option('turn-timeout'),
         );
 
@@ -200,7 +204,7 @@ class ChatAcpBridge extends Command
         ], fn (mixed $value): bool => $value !== null && $value !== false);
 
         $this->process = proc_open(
-            [$binary],
+            $this->agentCommand($binary),
             [
                 0 => ['pipe', 'r'],
                 1 => ['pipe', 'w'],
@@ -228,6 +232,35 @@ class ChatAcpBridge extends Command
                 'version' => '1.0.0',
             ],
         ], 10);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function agentCommand(string $binary): array
+    {
+        $command = [$binary];
+        $model = trim((string) config('services.codex_acp.model'));
+        $reasoningEffort = trim((string) config('services.codex_acp.reasoning_effort'));
+
+        if ($model !== '') {
+            $this->appendConfigOverride($command, 'model', $model);
+        }
+
+        if ($reasoningEffort !== '') {
+            $this->appendConfigOverride($command, 'model_reasoning_effort', $reasoningEffort);
+        }
+
+        return $command;
+    }
+
+    /**
+     * @param  array<int, string>  $command
+     */
+    private function appendConfigOverride(array &$command, string $key, string $value): void
+    {
+        $command[] = '-c';
+        $command[] = $key.'='.json_encode($value, JSON_THROW_ON_ERROR);
     }
 
     private function isProcessRunning(): bool
@@ -439,70 +472,50 @@ class ChatAcpBridge extends Command
         fwrite($this->pipes[0], json_encode($message, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)."\n");
     }
 
-    private function resolveChatLanguage(ChatSession $chatSession): string
+    private function buildWarmPrompt(): string
     {
-        return (string) data_get($chatSession->metadata, 'language') === 'en' ? 'en' : 'vi';
-    }
-
-    private function buildWarmPrompt(ChatSession $chatSession): string
-    {
-        $language = $this->resolveChatLanguage($chatSession);
-
-        if ($language === 'en') {
-            return implode("\n", [
-                'You are a menu assistant for An Uong AI.',
-                'Always reply in English, concise and friendly.',
-                'Only suggest dishes from the menu data below.',
-                'When mentioning a dish name, use the menu item "name" value, not "vietnamese_name".',
-                'When customers clearly choose dishes, return cart_actions with menu_code and quantity_delta. If quantity is missing, default to 1.',
-                'If the request is unclear, the dish is unavailable, or outside the menu, do not add to the cart.',
-                'All future replies must be pure JSON, no Markdown, in the exact format: {"reply":"...","cart_actions":[{"menu_code":"pho_bo_01","quantity_delta":1}]}',
-                '',
-                'MENU_JSON:',
-                $this->menuJson(),
-            ]);
-        }
-
         return implode("\n", [
-            'Bạn là trợ lý gọi món cho An Uong AI.',
-            'Luôn trả lời bằng tiếng Việt, ngắn gọn, thân thiện.',
-            'Chỉ tư vấn các món trong dữ liệu menu dưới đây.',
-            'Khi nhắc tên món bằng tiếng Việt, ưu tiên dùng giá trị "vietnamese_name" nếu có.',
-            'Khi khách chọn/gọi món rõ ràng, trả về cart_actions với menu_code và quantity_delta. Nếu khách không nói số lượng, mặc định là 1.',
-            'Nếu yêu cầu mơ hồ, món không có, hoặc không liên quan menu, không thêm giỏ hàng.',
-            'Mọi phản hồi sau này phải là JSON thuần, không Markdown, đúng dạng: {"reply":"...","cart_actions":[{"menu_code":"pho_bo_01","quantity_delta":1}]}',
+            'You are a bilingual menu assistant for An Uong AI.',
+            'Infer the reply language from the customer latest message on every turn. English message -> English reply. Vietnamese message -> Vietnamese reply. Mixed message -> use the dominant language in that latest message.',
+            'Do not rely on a stored chat language. The same chat session can switch between English and Vietnamese without being restarted.',
+            'Only suggest dishes and filters from the menu and allowed filter data below.',
+            'When replying in English and mentioning dishes, use the menu item "name" value.',
+            'When replying in Vietnamese and mentioning dishes, prefer "vietnamese_name" when present.',
+            'When customers clearly choose dishes, return cart_actions with menu_code and quantity_delta. If quantity is missing, default to 1. If the request is unclear, unavailable, or outside the menu, do not add to the cart.',
+            'When customers ask to show/filter menu items, return filter_action using only allowed categories and property keys. If no filter change is requested, filter_action must be null.',
+            'Examples:',
+            'Customer: add one beef pho -> reply in English, add the matching pho item.',
+            'Customer: thêm một phở bò -> reply in Vietnamese, add the matching pho item.',
+            'Customer: show vegetarian food -> filter_action category food, property_keys ["vegetarian"].',
+            'Customer: hiện món chay -> filter_action category food, property_keys ["vegetarian"].',
+            'All future replies must be pure JSON, no Markdown, in the exact format: {"reply":"...","cart_actions":[{"menu_code":"pho_bo_01","quantity_delta":1}],"filter_action":null}',
+            'filter_action shape when present: {"category":"food","property_keys":["vegetarian"]}',
+            '',
+            'ALLOWED_FILTERS_JSON:',
+            $this->allowedFiltersJson(),
             '',
             'MENU_JSON:',
             $this->menuJson(),
         ]);
     }
 
-    private function buildTurnPrompt(ChatTurn $turn, string $language): string
+    private function buildTurnPrompt(ChatTurn $turn): string
     {
-        if ($language === 'en') {
-            return implode("\n", [
-                'Customer message:',
-                $turn->user_message,
-                '',
-                'Current cart JSON:',
-                json_encode($this->cartContextForPrompt($turn), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
-                '',
-                'Use the menu item "name" value for dish names in the reply.',
-                '',
-                'Return JSON only: {"reply":"...","cart_actions":[{"menu_code":"...","quantity_delta":1}]}',
-            ]);
-        }
-
         return implode("\n", [
-            'Tin nhắn khách:',
+            'Customer latest message:',
             $turn->user_message,
             '',
-            'Giỏ hàng hiện tại JSON:',
+            'Current cart JSON:',
             json_encode($this->cartContextForPrompt($turn), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             '',
-            'Khi nhắc tên món, ưu tiên dùng "vietnamese_name" nếu có.',
+            'Current filter JSON:',
+            json_encode($this->filterContextForPrompt($turn), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             '',
-            'Trả về duy nhất JSON: {"reply":"...","cart_actions":[{"menu_code":"...","quantity_delta":1}]}',
+            'Infer reply language from the customer latest message only.',
+            'English reply: use "name" for dish names. Vietnamese reply: prefer "vietnamese_name" for dish names.',
+            'For filter requests, return filter_action with allowed category/property_keys. For no filter change, return null.',
+            '',
+            'Return JSON only: {"reply":"...","cart_actions":[{"menu_code":"...","quantity_delta":1}],"filter_action":null}',
         ]);
     }
 
@@ -517,24 +530,38 @@ class ChatAcpBridge extends Command
                 'vietnamese_name' => $food->vietnamese_name,
                 'category' => $food->category->value,
                 'description' => $food->description,
+                'vietnamese_description' => $food->vietnamese_description,
                 'ingredients' => $food->ingredients,
                 'price_vnd' => $food->price_vnd,
                 'subcategory' => $food->subcategory,
                 'protein' => $food->protein,
                 'spiciness' => $food->spiciness,
                 'vegetarian' => $food->vegetarian,
+                'halal_friendly' => $food->halal_friendly,
                 'contains_pork' => $food->contains_pork,
                 'contains_beef' => $food->contains_beef,
                 'contains_seafood' => $food->contains_seafood,
                 'contains_nuts' => $food->contains_nuts,
                 'contains_dairy' => $food->contains_dairy,
                 'tourist_favorite' => $food->tourist_favorite,
+                'adventurous' => $food->adventurous,
                 'healthy' => $food->healthy,
+                'quick_meal' => $food->quick_meal,
+                'heavy_meal' => $food->heavy_meal,
+                'shareable' => $food->shareable,
                 'keywords' => $food->keywords,
                 'recommendation_reason' => $food->recommendation_reason,
             ])
             ->values()
             ->toJson(JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    }
+
+    private function allowedFiltersJson(): string
+    {
+        return json_encode([
+            'categories' => MenuFilterDefinitions::categoryKeys(),
+            'property_filters' => MenuFilterDefinitions::propertyFilters(),
+        ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     }
 
     /**
@@ -569,6 +596,23 @@ class ChatAcpBridge extends Command
     }
 
     /**
+     * @return array{category: string|null, property_keys: array<int, string>}
+     */
+    private function filterContextForPrompt(ChatTurn $turn): array
+    {
+        $filterContext = is_array($turn->filter_context) ? $turn->filter_context : [];
+        $category = $filterContext['category'] ?? null;
+        $propertyKeys = $filterContext['property_keys'] ?? [];
+
+        return [
+            'category' => is_string($category) ? $category : null,
+            'property_keys' => is_array($propertyKeys)
+                ? array_values(array_filter($propertyKeys, fn (mixed $key): bool => is_string($key)))
+                : [],
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function decodeJsonEnvelope(string $responseText, string $language): array
@@ -593,6 +637,7 @@ class ChatAcpBridge extends Command
         return [
             'reply' => $responseText !== '' ? $responseText : $this->fallbackReply($language),
             'cart_actions' => [],
+            'filter_action' => null,
         ];
     }
 
@@ -619,6 +664,49 @@ class ChatAcpBridge extends Command
         return $language === 'en'
             ? 'I could not generate a good response. Please try again.'
             : 'Mình chưa có phản hồi phù hợp.';
+    }
+
+    private function fallbackConnectionReply(ChatTurn $turn): string
+    {
+        return $this->detectMessageLanguage($turn->user_message) === 'en'
+            ? 'I could not connect to the ordering assistant. Please try again later.'
+            : 'Mình chưa kết nối được trợ lý gọi món. Vui lòng thử lại sau.';
+    }
+
+    private function detectMessageLanguage(?string $message): string
+    {
+        $message = mb_strtolower((string) $message);
+
+        if (preg_match('/[ăâđêôơưáàảãạắằẳẵặấầẩẫậéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]/u', $message) === 1) {
+            return 'vi';
+        }
+
+        $vietnameseMarkers = [
+            'anh',
+            'cho',
+            'chay',
+            'com',
+            'cua',
+            'do',
+            'em',
+            'ga',
+            'goi',
+            'hien',
+            'khong',
+            'mon',
+            'mot',
+            'nuoc',
+            'pho',
+            'thit',
+            'them',
+            'toi',
+            'tra',
+        ];
+
+        $words = preg_split('/[^a-z]+/u', $message) ?: [];
+        $matches = count(array_intersect($vietnameseMarkers, $words));
+
+        return $matches >= 2 ? 'vi' : 'en';
     }
 
     /**
@@ -670,6 +758,43 @@ class ChatAcpBridge extends Command
             ->filter()
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array{category: string, property_keys: array<int, string>}|null
+     */
+    private function validatedFilterAction(mixed $rawAction): ?array
+    {
+        if (! is_array($rawAction)) {
+            return null;
+        }
+
+        $category = $rawAction['category'] ?? null;
+        $propertyKeys = $rawAction['property_keys'] ?? [];
+
+        if (! is_string($category) || ! in_array($category, MenuFilterDefinitions::categoryKeys(), true)) {
+            return null;
+        }
+
+        if (! is_array($propertyKeys)) {
+            return null;
+        }
+
+        $allowedPropertyKeys = MenuFilterDefinitions::propertyKeys();
+        $validatedPropertyKeys = collect($propertyKeys)
+            ->filter(fn (mixed $propertyKey): bool => is_string($propertyKey) && in_array($propertyKey, $allowedPropertyKeys, true))
+            ->unique()
+            ->values()
+            ->all();
+
+        if (count($validatedPropertyKeys) !== count($propertyKeys)) {
+            return null;
+        }
+
+        return [
+            'category' => $category,
+            'property_keys' => $validatedPropertyKeys,
+        ];
     }
 
     private function closeIdleSessions(): void
