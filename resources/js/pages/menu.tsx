@@ -1,6 +1,5 @@
 import { Head } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
-import type { MouseEvent } from 'react';
 
 interface Category {
     key: string;
@@ -25,12 +24,18 @@ interface MenuProps {
     foods: Food[];
 }
 
+interface CartItem {
+    food: Food;
+    quantity: number;
+}
+
 export default function Menu({ categories, foods }: MenuProps) {
     const [activeCategory, setActiveCategory] = useState<string>(
         () => categories[0]?.key ?? 'food',
     );
     const [quantities, setQuantities] = useState<Record<number, number>>({});
     const [selectedFood, setSelectedFood] = useState<Food | null>(null);
+    const [isCartOpen, setIsCartOpen] = useState(false);
 
     const visibleFoods = useMemo(
         () => foods.filter((food) => food.category === activeCategory),
@@ -46,14 +51,40 @@ export default function Menu({ categories, foods }: MenuProps) {
         [quantities],
     );
 
+    const cartItems = useMemo<CartItem[]>(
+        () =>
+            foods
+                .map((food) => ({
+                    food,
+                    quantity: quantities[food.id] ?? 0,
+                }))
+                .filter((item) => item.quantity > 0),
+        [foods, quantities],
+    );
+
+    const cartTotalVnd = useMemo(
+        () =>
+            cartItems.reduce(
+                (total, item) => total + item.food.price_vnd * item.quantity,
+                0,
+            ),
+        [cartItems],
+    );
+
     useEffect(() => {
-        if (!selectedFood) {
+        if (!selectedFood && !isCartOpen) {
             return;
         }
 
         const originalOverflow = document.body.style.overflow;
         const handleKeyDown = (event: KeyboardEvent): void => {
             if (event.key === 'Escape') {
+                if (isCartOpen) {
+                    setIsCartOpen(false);
+
+                    return;
+                }
+
                 setSelectedFood(null);
             }
         };
@@ -65,7 +96,7 @@ export default function Menu({ categories, foods }: MenuProps) {
             document.body.style.overflow = originalOverflow;
             document.removeEventListener('keydown', handleKeyDown);
         };
-    }, [selectedFood]);
+    }, [isCartOpen, selectedFood]);
 
     const updateQuantity = (foodId: number, change: number): void => {
         setQuantities((current) => {
@@ -78,22 +109,13 @@ export default function Menu({ categories, foods }: MenuProps) {
         });
     };
 
-    const stopAndUpdateQuantity = (
-        event: MouseEvent<HTMLButtonElement>,
-        foodId: number,
-        change: number,
-    ): void => {
-        event.stopPropagation();
-        updateQuantity(foodId, change);
-    };
-
     return (
         <>
             <Head title="Menu" />
             <main className="min-h-screen bg-[#f8f3e6] text-[#21170f]">
                 <div className="border-b-4 border-[#d71920] bg-[#ffc72c]">
                     <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center justify-between gap-3">
                             <div>
                                 <p className="text-xs font-semibold tracking-[0.18em] text-[#8a1116] uppercase">
                                     An Uong AI Menu
@@ -102,8 +124,22 @@ export default function Menu({ categories, foods }: MenuProps) {
                                     Food and drinks ready to browse
                                 </h1>
                             </div>
-                            <div className="rounded-md bg-[#21170f] px-4 py-2 text-sm font-bold text-white">
-                                {selectedCount}
+
+                            <div className="flex shrink-0 items-center gap-2">
+                                <button
+                                    type="button"
+                                    aria-label="Open cart"
+                                    onClick={() => setIsCartOpen(true)}
+                                    className="grid h-11 w-11 place-items-center rounded-md border-2 border-[#21170f] bg-white text-[#21170f] shadow-[3px_3px_0_#d71920] transition hover:-translate-y-0.5 hover:bg-[#fff5d0] focus-visible:ring-4 focus-visible:ring-[#d71920]/35 focus-visible:outline-none"
+                                >
+                                    <CartIcon />
+                                </button>
+                                <span
+                                    aria-label={`${selectedCount} selected foods`}
+                                    className="rounded-md bg-[#21170f] px-3 py-2 text-sm font-bold whitespace-nowrap text-white"
+                                >
+                                    {selectedCount}
+                                </span>
                             </div>
                         </div>
 
@@ -150,17 +186,23 @@ export default function Menu({ categories, foods }: MenuProps) {
                                 food={food}
                                 quantity={quantities[food.id] ?? 0}
                                 onOpen={() => setSelectedFood(food)}
-                                onIncrement={(event) =>
-                                    stopAndUpdateQuantity(event, food.id, 1)
-                                }
-                                onDecrement={(event) =>
-                                    stopAndUpdateQuantity(event, food.id, -1)
-                                }
+                                onIncrement={() => updateQuantity(food.id, 1)}
+                                onDecrement={() => updateQuantity(food.id, -1)}
                             />
                         ))}
                     </section>
                 </div>
             </main>
+
+            {isCartOpen ? (
+                <CartDrawer
+                    items={cartItems}
+                    totalVnd={cartTotalVnd}
+                    onClose={() => setIsCartOpen(false)}
+                    onIncrement={(foodId) => updateQuantity(foodId, 1)}
+                    onDecrement={(foodId) => updateQuantity(foodId, -1)}
+                />
+            ) : null}
 
             {selectedFood ? (
                 <ProductModal
@@ -219,8 +261,8 @@ function ProductCard({
     food: Food;
     quantity: number;
     onOpen: () => void;
-    onIncrement: (event: MouseEvent<HTMLButtonElement>) => void;
-    onDecrement: (event: MouseEvent<HTMLButtonElement>) => void;
+    onIncrement: () => void;
+    onDecrement: () => void;
 }) {
     return (
         <article
@@ -289,8 +331,8 @@ function QuantityStepper({
     onDecrement,
 }: {
     quantity: number;
-    onIncrement: (event: MouseEvent<HTMLButtonElement>) => void;
-    onDecrement: (event: MouseEvent<HTMLButtonElement>) => void;
+    onIncrement: () => void;
+    onDecrement: () => void;
 }) {
     return (
         <div className="grid h-11 grid-cols-[44px_1fr_44px] overflow-hidden rounded-md border-2 border-[#21170f] bg-[#fff9e8]">
@@ -298,7 +340,10 @@ function QuantityStepper({
                 type="button"
                 aria-label="Decrease quantity"
                 disabled={quantity === 0}
-                onClick={onDecrement}
+                onClick={(event) => {
+                    event.stopPropagation();
+                    onDecrement();
+                }}
                 className="text-xl font-black disabled:cursor-not-allowed disabled:text-[#b7a68d] enabled:hover:bg-[#ffc72c]"
             >
                 -
@@ -309,7 +354,10 @@ function QuantityStepper({
             <button
                 type="button"
                 aria-label="Increase quantity"
-                onClick={onIncrement}
+                onClick={(event) => {
+                    event.stopPropagation();
+                    onIncrement();
+                }}
                 className="text-xl font-black hover:bg-[#ffc72c]"
             >
                 +
@@ -385,18 +433,166 @@ function ProductModal({
                         </div>
                         <QuantityStepper
                             quantity={quantity}
-                            onIncrement={(event) => {
-                                event.stopPropagation();
-                                onIncrement();
-                            }}
-                            onDecrement={(event) => {
-                                event.stopPropagation();
-                                onDecrement();
-                            }}
+                            onIncrement={onIncrement}
+                            onDecrement={onDecrement}
                         />
                     </div>
                 </div>
             </section>
         </div>
     );
+}
+
+function CartDrawer({
+    items,
+    totalVnd,
+    onClose,
+    onIncrement,
+    onDecrement,
+}: {
+    items: CartItem[];
+    totalVnd: number;
+    onClose: () => void;
+    onIncrement: (foodId: number) => void;
+    onDecrement: (foodId: number) => void;
+}) {
+    return (
+        <div
+            role="presentation"
+            onClick={onClose}
+            className="fixed inset-0 z-50 flex justify-end bg-black/55"
+        >
+            <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="cart-drawer-title"
+                onClick={(event) => event.stopPropagation()}
+                className="flex h-full w-full max-w-md flex-col border-l-2 border-[#21170f] bg-white shadow-[-8px_0_0_#ffc72c]"
+            >
+                <div className="flex items-start justify-between gap-4 border-b-2 border-[#21170f] bg-[#ffc72c] p-4">
+                    <div>
+                        <p className="text-xs font-black tracking-[0.16em] text-[#8a1116] uppercase">
+                            Current order
+                        </p>
+                        <h2
+                            id="cart-drawer-title"
+                            className="mt-1 text-2xl leading-tight font-black"
+                        >
+                            Cart
+                        </h2>
+                    </div>
+                    <button
+                        type="button"
+                        aria-label="Close cart"
+                        onClick={onClose}
+                        className="grid h-10 w-10 shrink-0 place-items-center rounded-md border-2 border-[#21170f] bg-white text-xl font-black hover:bg-[#fff5d0]"
+                    >
+                        x
+                    </button>
+                </div>
+
+                {items.length > 0 ? (
+                    <div className="flex-1 overflow-y-auto p-4">
+                        <div className="flex flex-col gap-3">
+                            {items.map(({ food, quantity }) => (
+                                <article
+                                    key={food.id}
+                                    className="rounded-md border-2 border-[#21170f] bg-[#fff9e8] p-3"
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <h3 className="font-black leading-tight">
+                                                {food.name}
+                                            </h3>
+                                            <p className="mt-1 text-xs font-bold text-[#8a1116]">
+                                                Unit: {food.formatted_price}
+                                            </p>
+                                        </div>
+                                        <p className="shrink-0 text-sm font-black text-[#d71920]">
+                                            {formatVnd(
+                                                food.price_vnd * quantity,
+                                            )}
+                                        </p>
+                                    </div>
+
+                                    <div className="mt-3 grid gap-2">
+                                        <QuantityStepper
+                                            quantity={quantity}
+                                            onIncrement={() =>
+                                                onIncrement(food.id)
+                                            }
+                                            onDecrement={() =>
+                                                onDecrement(food.id)
+                                            }
+                                        />
+                                        <div className="flex items-center justify-between gap-3 text-xs font-bold text-[#66513d]">
+                                            <span>Quantity: {quantity}</span>
+                                            <span>
+                                                Line total:{' '}
+                                                {formatVnd(
+                                                    food.price_vnd * quantity,
+                                                )}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </article>
+                            ))}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex flex-1 items-center justify-center p-6 text-center">
+                        <div className="max-w-64">
+                            <div className="mx-auto grid h-14 w-14 place-items-center rounded-md border-2 border-[#21170f] bg-[#fff9e8] text-[#d71920]">
+                                <CartIcon />
+                            </div>
+                            <p className="mt-4 text-lg font-black">
+                                Your cart is empty
+                            </p>
+                            <p className="mt-2 text-sm leading-5 text-[#66513d]">
+                                Add foods from the menu to see them here.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                <div className="border-t-2 border-[#21170f] bg-[#fff9e8] p-4">
+                    <div className="flex items-center justify-between gap-4">
+                        <span className="text-sm font-black tracking-[0.14em] text-[#8a1116] uppercase">
+                            Total
+                        </span>
+                        <span className="text-xl font-black text-[#d71920]">
+                            {formatVnd(totalVnd)}
+                        </span>
+                    </div>
+                </div>
+            </section>
+        </div>
+    );
+}
+
+function CartIcon() {
+    return (
+        <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2.4"
+        >
+            <path d="M6 6h15l-1.5 8.5H8L6 3H3" />
+            <path d="M8 19.5h.01" />
+            <path d="M18 19.5h.01" />
+        </svg>
+    );
+}
+
+function formatVnd(value: number): string {
+    return new Intl.NumberFormat('vi-VN', {
+        currency: 'VND',
+        maximumFractionDigits: 0,
+        style: 'currency',
+    }).format(value);
 }
