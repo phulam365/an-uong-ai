@@ -30,7 +30,7 @@ class StoreChatMessageRequest extends FormRequest
             'cart.*.food_id' => ['required', 'integer', 'exists:foods,id'],
             'cart.*.quantity' => ['required', 'integer', 'min:1', 'max:99'],
             'filter_context' => ['sometimes', 'array'],
-            'filter_context.category' => ['required_with:filter_context', 'string', Rule::in(MenuFilterDefinitions::categoryKeys())],
+            'filter_context.category' => ['nullable', 'string', Rule::in(MenuFilterDefinitions::categoryKeys())],
             'filter_context.property_keys' => ['sometimes', 'array', 'max:15'],
             'filter_context.property_keys.*' => ['string', Rule::in(MenuFilterDefinitions::propertyKeys())],
         ];

@@ -13,7 +13,7 @@ class ChatMessageController extends Controller
 {
     public function store(StoreChatMessageRequest $request, ChatTurnResponder $responder): JsonResponse
     {
-        /** @var array{message: string, cart?: array<int, array{food_id: int, quantity: int}>, filter_context?: array{category: string, property_keys?: array<int, string>}} $validated */
+        /** @var array{message: string, cart?: array<int, array{food_id: int, quantity: int}>, filter_context?: array{category?: string|null, property_keys?: array<int, string>}} $validated */
         $validated = $request->validated();
 
         $chatSession = ChatSession::query()->firstOrCreate(

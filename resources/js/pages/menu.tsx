@@ -76,6 +76,8 @@ interface ChatMessage {
 type MenuLanguage = 'vi' | 'en';
 type LocalizedText = Record<MenuLanguage, string>;
 
+const ALL_CATEGORY_KEY = 'all';
+
 const uiText: Record<
     MenuLanguage,
     {
@@ -220,9 +222,19 @@ export default function Menu({
     propertyFilters,
     foods,
 }: MenuProps) {
-    const [activeCategory, setActiveCategory] = useState<string>(
-        () => categories[0]?.key ?? 'food',
+    const categoryOptions = useMemo<Category[]>(
+        () => [
+            {
+                key: ALL_CATEGORY_KEY,
+                labels: { en: 'All', vi: 'Tất cả' },
+                count: foods.length,
+            },
+            ...categories,
+        ],
+        [categories, foods.length],
     );
+    const [activeCategory, setActiveCategory] =
+        useState<string>(ALL_CATEGORY_KEY);
     const [activePropertyKeys, setActivePropertyKeys] = useState<string[]>([]);
     const [quantities, setQuantities] = useState<Record<number, number>>({});
     const [selectedFood, setSelectedFood] = useState<Food | null>(null);
@@ -242,7 +254,7 @@ export default function Menu({
         const counts = new Map<string, number>();
 
         foods
-            .filter((food) => food.category === activeCategory)
+            .filter((food) => matchesActiveCategory(food, activeCategory))
             .forEach((food) => {
                 food.property_keys.forEach((propertyKey) => {
                     counts.set(propertyKey, (counts.get(propertyKey) ?? 0) + 1);
@@ -256,7 +268,7 @@ export default function Menu({
         () =>
             foods.filter(
                 (food) =>
-                    food.category === activeCategory &&
+                    matchesActiveCategory(food, activeCategory) &&
                     activePropertyKeys.every((propertyKey) =>
                         food.property_keys.includes(propertyKey),
                     ),
@@ -376,7 +388,7 @@ export default function Menu({
                         </div>
 
                         <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
-                            {categories.map((category) => (
+                            {categoryOptions.map((category) => (
                                 <CategoryButton
                                     key={category.key}
                                     category={category}
@@ -420,7 +432,7 @@ export default function Menu({
                             {t.categories}
                         </p>
                         <div className="flex flex-col gap-2">
-                            {categories.map((category) => (
+                            {categoryOptions.map((category) => (
                                 <CategoryButton
                                     key={category.key}
                                     category={category}
@@ -1351,6 +1363,12 @@ function localizedText(labels: LocalizedText, language: MenuLanguage): string {
     return labels[language] || labels.en;
 }
 
+function matchesActiveCategory(food: Food, activeCategory: string): boolean {
+    return (
+        activeCategory === ALL_CATEGORY_KEY || food.category === activeCategory
+    );
+}
+
 function welcomeChatMessage(language: MenuLanguage): ChatMessage {
     return {
         id: `welcome-${language}`,
@@ -1381,7 +1399,7 @@ function filterContextPayload(
     activePropertyKeys: string[],
 ) {
     return {
-        category: activeCategory,
+        category: activeCategory === ALL_CATEGORY_KEY ? null : activeCategory,
         property_keys: activePropertyKeys,
     };
 }
