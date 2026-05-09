@@ -13,6 +13,12 @@ interface Category {
     count: number;
 }
 
+interface PropertyFilter {
+    key: string;
+    label: string;
+    count: number;
+}
+
 interface Food {
     id: number;
     name: string;
@@ -25,10 +31,13 @@ interface Food {
     formatted_price: string;
     price_vnd: number;
     image_url: string;
+    property_keys: string[];
+    property_labels: string[];
 }
 
 interface MenuProps {
     categories: Category[];
+    propertyFilters: PropertyFilter[];
     foods: Food[];
 }
 
@@ -59,18 +68,44 @@ interface ChatMessage {
 
 type MenuLanguage = 'vi' | 'en';
 
-export default function Menu({ categories, foods }: MenuProps) {
+export default function Menu({
+    categories,
+    propertyFilters,
+    foods,
+}: MenuProps) {
     const [activeCategory, setActiveCategory] = useState<string>(
         () => categories[0]?.key ?? 'food',
     );
+    const [activePropertyKeys, setActivePropertyKeys] = useState<string[]>([]);
     const [quantities, setQuantities] = useState<Record<number, number>>({});
     const [selectedFood, setSelectedFood] = useState<Food | null>(null);
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [language, setLanguage] = useState<MenuLanguage>('vi');
 
+    const propertyCountsByCategory = useMemo(() => {
+        const counts = new Map<string, number>();
+
+        foods
+            .filter((food) => food.category === activeCategory)
+            .forEach((food) => {
+                food.property_keys.forEach((propertyKey) => {
+                    counts.set(propertyKey, (counts.get(propertyKey) ?? 0) + 1);
+                });
+            });
+
+        return counts;
+    }, [activeCategory, foods]);
+
     const visibleFoods = useMemo(
-        () => foods.filter((food) => food.category === activeCategory),
-        [activeCategory, foods],
+        () =>
+            foods.filter(
+                (food) =>
+                    food.category === activeCategory &&
+                    activePropertyKeys.every((propertyKey) =>
+                        food.property_keys.includes(propertyKey),
+                    ),
+            ),
+        [activeCategory, activePropertyKeys, foods],
     );
 
     const cartItems = useMemo<CartItem[]>(
@@ -136,6 +171,14 @@ export default function Menu({ categories, foods }: MenuProps) {
         });
     };
 
+    const togglePropertyFilter = (propertyKey: string): void => {
+        setActivePropertyKeys((current) =>
+            current.includes(propertyKey)
+                ? current.filter((key) => key !== propertyKey)
+                : [...current, propertyKey],
+        );
+    };
+
     return (
         <>
             <Head title="Menu" />
@@ -191,6 +234,28 @@ export default function Menu({ categories, foods }: MenuProps) {
                                 />
                             ))}
                         </div>
+
+                        {propertyFilters.length > 0 ? (
+                            <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
+                                {propertyFilters.map((filter) => (
+                                    <PropertyFilterButton
+                                        key={filter.key}
+                                        filter={filter}
+                                        count={
+                                            propertyCountsByCategory.get(
+                                                filter.key,
+                                            ) ?? 0
+                                        }
+                                        isActive={activePropertyKeys.includes(
+                                            filter.key,
+                                        )}
+                                        onClick={() =>
+                                            togglePropertyFilter(filter.key)
+                                        }
+                                    />
+                                ))}
+                            </div>
+                        ) : null}
                     </div>
                 </div>
 
@@ -211,21 +276,96 @@ export default function Menu({ categories, foods }: MenuProps) {
                                 />
                             ))}
                         </div>
+
+                        {propertyFilters.length > 0 ? (
+                            <>
+                                <div className="my-4 border-t border-border" />
+                                <div className="flex items-center justify-between gap-3 px-2">
+                                    <p className="text-xs font-semibold tracking-[0.16em] text-olive uppercase">
+                                        Filter by
+                                    </p>
+                                    {activePropertyKeys.length > 0 ? (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setActivePropertyKeys([])
+                                            }
+                                            className="text-xs font-semibold text-wine transition hover:text-wine-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
+                                        >
+                                            Clear
+                                        </button>
+                                    ) : null}
+                                </div>
+                                <div className="mt-3 flex flex-col gap-2">
+                                    {propertyFilters.map((filter) => (
+                                        <PropertyFilterButton
+                                            key={filter.key}
+                                            filter={filter}
+                                            count={
+                                                propertyCountsByCategory.get(
+                                                    filter.key,
+                                                ) ?? 0
+                                            }
+                                            isActive={activePropertyKeys.includes(
+                                                filter.key,
+                                            )}
+                                            onClick={() =>
+                                                togglePropertyFilter(filter.key)
+                                            }
+                                        />
+                                    ))}
+                                </div>
+                            </>
+                        ) : null}
                     </aside>
 
-                    <section className="grid grid-cols-1 gap-4 min-[430px]:grid-cols-2 xl:grid-cols-3">
-                        {visibleFoods.map((food) => (
-                            <ProductCard
-                                key={food.id}
-                                food={food}
-                                language={language}
-                                quantity={quantities[food.id] ?? 0}
-                                onOpen={() => setSelectedFood(food)}
-                                onIncrement={() => updateQuantity(food.id, 1)}
-                                onDecrement={() => updateQuantity(food.id, -1)}
-                            />
-                        ))}
-                    </section>
+                    <div className="flex flex-col gap-4">
+                        <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-semibold text-muted">
+                                {visibleFoods.length}{' '}
+                                {visibleFoods.length === 1 ? 'item' : 'items'}
+                            </p>
+                            {activePropertyKeys.length > 0 ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setActivePropertyKeys([])}
+                                    className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-wine shadow-sm transition hover:border-wine hover:text-wine-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none lg:hidden"
+                                >
+                                    Clear filters
+                                </button>
+                            ) : null}
+                        </div>
+
+                        {visibleFoods.length > 0 ? (
+                            <section className="grid grid-cols-1 gap-4 min-[430px]:grid-cols-2 xl:grid-cols-3">
+                                {visibleFoods.map((food) => (
+                                    <ProductCard
+                                        key={food.id}
+                                        food={food}
+                                        language={language}
+                                        quantity={quantities[food.id] ?? 0}
+                                        onOpen={() => setSelectedFood(food)}
+                                        onIncrement={() =>
+                                            updateQuantity(food.id, 1)
+                                        }
+                                        onDecrement={() =>
+                                            updateQuantity(food.id, -1)
+                                        }
+                                    />
+                                ))}
+                            </section>
+                        ) : (
+                            <section className="rounded-lg border border-border bg-surface px-5 py-12 text-center shadow-sm">
+                                <p className="text-base font-semibold">
+                                    No matching menu items
+                                </p>
+                                <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted">
+                                    Try a different category or remove one of
+                                    the selected properties.
+                                </p>
+                            </section>
+                        )}
+                    </div>
                 </div>
             </main>
 
@@ -557,6 +697,43 @@ function CategoryButton({
     );
 }
 
+function PropertyFilterButton({
+    filter,
+    count,
+    isActive,
+    onClick,
+}: {
+    filter: PropertyFilter;
+    count: number;
+    isActive: boolean;
+    onClick: () => void;
+}) {
+    const isDisabled = count === 0 && !isActive;
+
+    return (
+        <button
+            type="button"
+            aria-pressed={isActive}
+            disabled={isDisabled}
+            onClick={onClick}
+            className={`flex min-w-fit items-center justify-between gap-3 rounded-full border px-3 py-2 text-left text-sm font-semibold transition focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 lg:w-full lg:rounded-lg ${
+                isActive
+                    ? 'border-wine bg-wine text-white shadow-sm'
+                    : 'border-border bg-paper text-ink hover:border-brass hover:bg-surface'
+            }`}
+        >
+            <span>{filter.label}</span>
+            <span
+                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                    isActive ? 'bg-brass text-ink' : 'bg-surface text-wine'
+                }`}
+            >
+                {count}
+            </span>
+        </button>
+    );
+}
+
 function ProductCard({
     food,
     language,
@@ -608,6 +785,18 @@ function ProductCard({
                     <p className="line-clamp-2 text-sm leading-5 text-muted">
                         {foodDescription}
                     </p>
+                    {food.property_labels.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                            {food.property_labels.slice(0, 3).map((label) => (
+                                <span
+                                    key={label}
+                                    className="rounded-full border border-border bg-paper px-2 py-0.5 text-[11px] leading-5 font-semibold text-olive"
+                                >
+                                    {label}
+                                </span>
+                            ))}
+                        </div>
+                    ) : null}
                 </div>
 
                 <div className="flex flex-col gap-3">
@@ -730,6 +919,19 @@ function ProductModal({
                     </div>
 
                     <p className="leading-6 text-muted">{foodDescription}</p>
+
+                    {food.property_labels.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                            {food.property_labels.map((label) => (
+                                <span
+                                    key={label}
+                                    className="rounded-full border border-border bg-paper px-3 py-1 text-xs font-semibold text-olive"
+                                >
+                                    {label}
+                                </span>
+                            ))}
+                        </div>
+                    ) : null}
 
                     <div className="mt-auto flex flex-col gap-4">
                         <div className="rounded-lg border border-wine/15 bg-wine px-4 py-3 text-xl font-semibold text-white shadow-sm">

@@ -10,6 +10,27 @@ use Inertia\Response;
 
 class MenuController extends Controller
 {
+    /**
+     * @var array<int, array{key: string, label: string}>
+     */
+    private const PROPERTY_FILTERS = [
+        ['key' => 'vegetarian', 'label' => 'Vegetarian'],
+        ['key' => 'halal_friendly', 'label' => 'Halal friendly'],
+        ['key' => 'beginner_friendly', 'label' => 'Beginner friendly'],
+        ['key' => 'tourist_favorite', 'label' => 'Tourist favorite'],
+        ['key' => 'adventurous', 'label' => 'Adventurous'],
+        ['key' => 'healthy', 'label' => 'Healthy'],
+        ['key' => 'comfort_food', 'label' => 'Comfort food'],
+        ['key' => 'quick_meal', 'label' => 'Quick meal'],
+        ['key' => 'heavy_meal', 'label' => 'Heavy meal'],
+        ['key' => 'shareable', 'label' => 'Shareable'],
+        ['key' => 'contains_pork', 'label' => 'Pork'],
+        ['key' => 'contains_beef', 'label' => 'Beef'],
+        ['key' => 'contains_seafood', 'label' => 'Seafood'],
+        ['key' => 'contains_nuts', 'label' => 'Nuts'],
+        ['key' => 'contains_dairy', 'label' => 'Dairy'],
+    ];
+
     public function __invoke(): Response
     {
         $foods = Food::query()
@@ -28,6 +49,15 @@ class MenuController extends Controller
                     'count' => $counts->get($category->value, 0),
                 ])
                 ->values(),
+            'propertyFilters' => collect(self::PROPERTY_FILTERS)
+                ->map(fn (array $filter): array => [
+                    ...$filter,
+                    'count' => $foods->filter(
+                        fn (Food $food): bool => (bool) $food->getAttribute($filter['key']),
+                    )->count(),
+                ])
+                ->filter(fn (array $filter): bool => $filter['count'] > 0)
+                ->values(),
             'foods' => $foods
                 ->map(fn (Food $food): array => [
                     'id' => $food->id,
@@ -41,8 +71,34 @@ class MenuController extends Controller
                     'formatted_price' => number_format($food->price_vnd).' VND',
                     'price_vnd' => $food->price_vnd,
                     'image_url' => Storage::disk('public')->url($food->image_path),
+                    'property_keys' => $this->propertyKeysFor($food),
+                    'property_labels' => $this->propertyLabelsFor($food),
                 ])
                 ->values(),
         ]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function propertyKeysFor(Food $food): array
+    {
+        return collect(self::PROPERTY_FILTERS)
+            ->filter(fn (array $filter): bool => (bool) $food->getAttribute($filter['key']))
+            ->pluck('key')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function propertyLabelsFor(Food $food): array
+    {
+        return collect(self::PROPERTY_FILTERS)
+            ->filter(fn (array $filter): bool => (bool) $food->getAttribute($filter['key']))
+            ->pluck('label')
+            ->values()
+            ->all();
     }
 }
