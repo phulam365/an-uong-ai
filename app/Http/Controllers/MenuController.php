@@ -15,12 +15,9 @@ class MenuController extends Controller
      */
     private const PROPERTY_FILTERS = [
         ['key' => 'vegetarian', 'label' => 'Vegetarian'],
-        ['key' => 'halal_friendly', 'label' => 'Halal friendly'],
-        ['key' => 'beginner_friendly', 'label' => 'Beginner friendly'],
         ['key' => 'tourist_favorite', 'label' => 'Tourist favorite'],
         ['key' => 'adventurous', 'label' => 'Adventurous'],
         ['key' => 'healthy', 'label' => 'Healthy'],
-        ['key' => 'comfort_food', 'label' => 'Comfort food'],
         ['key' => 'quick_meal', 'label' => 'Quick meal'],
         ['key' => 'heavy_meal', 'label' => 'Heavy meal'],
         ['key' => 'shareable', 'label' => 'Shareable'],

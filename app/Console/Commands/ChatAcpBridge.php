@@ -528,10 +528,8 @@ class ChatAcpBridge extends Command
                 'contains_seafood' => $food->contains_seafood,
                 'contains_nuts' => $food->contains_nuts,
                 'contains_dairy' => $food->contains_dairy,
-                'beginner_friendly' => $food->beginner_friendly,
                 'tourist_favorite' => $food->tourist_favorite,
                 'healthy' => $food->healthy,
-                'comfort_food' => $food->comfort_food,
                 'keywords' => $food->keywords,
                 'recommendation_reason' => $food->recommendation_reason,
             ])
