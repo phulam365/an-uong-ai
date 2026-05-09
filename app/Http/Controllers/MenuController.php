@@ -32,10 +32,12 @@ class MenuController extends Controller
                 ->map(fn (Food $food): array => [
                     'id' => $food->id,
                     'name' => $food->name,
+                    'vietnamese_name' => $food->vietnamese_name,
                     'slug' => $food->slug,
                     'category' => $food->category->value,
                     'category_label' => $food->category->label(),
                     'ingredients' => $food->ingredients ?? '',
+                    'vietnamese_description' => $food->vietnamese_description,
                     'formatted_price' => number_format($food->price_vnd).' VND',
                     'price_vnd' => $food->price_vnd,
                     'image_url' => Storage::disk('public')->url($food->image_path),

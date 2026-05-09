@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Model;
     'menu_code',
     'vietnamese_name',
     'description',
+    'vietnamese_description',
     'subcategory',
     'protein',
     'cooking_style',

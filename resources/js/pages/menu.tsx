@@ -10,10 +10,12 @@ interface Category {
 interface Food {
     id: number;
     name: string;
+    vietnamese_name: string | null;
     slug: string;
     category: string;
     category_label: string;
     ingredients: string;
+    vietnamese_description: string | null;
     formatted_price: string;
     price_vnd: number;
     image_url: string;
@@ -29,6 +31,8 @@ interface CartItem {
     quantity: number;
 }
 
+type MenuLanguage = 'vi' | 'en';
+
 export default function Menu({ categories, foods }: MenuProps) {
     const [activeCategory, setActiveCategory] = useState<string>(
         () => categories[0]?.key ?? 'food',
@@ -36,6 +40,7 @@ export default function Menu({ categories, foods }: MenuProps) {
     const [quantities, setQuantities] = useState<Record<number, number>>({});
     const [selectedFood, setSelectedFood] = useState<Food | null>(null);
     const [isCartOpen, setIsCartOpen] = useState(false);
+    const [language, setLanguage] = useState<MenuLanguage>('vi');
 
     const visibleFoods = useMemo(
         () => foods.filter((food) => food.category === activeCategory),
@@ -117,6 +122,10 @@ export default function Menu({ categories, foods }: MenuProps) {
                             </div>
 
                             <div className="flex shrink-0 items-center gap-2">
+                                <LanguageSwitch
+                                    language={language}
+                                    onChange={setLanguage}
+                                />
                                 <button
                                     type="button"
                                     aria-label="Open cart"
@@ -167,6 +176,7 @@ export default function Menu({ categories, foods }: MenuProps) {
                             <ProductCard
                                 key={food.id}
                                 food={food}
+                                language={language}
                                 quantity={quantities[food.id] ?? 0}
                                 onOpen={() => setSelectedFood(food)}
                                 onIncrement={() => updateQuantity(food.id, 1)}
@@ -180,6 +190,7 @@ export default function Menu({ categories, foods }: MenuProps) {
             {isCartOpen ? (
                 <CartDrawer
                     items={cartItems}
+                    language={language}
                     totalVnd={cartTotalVnd}
                     onClose={() => setIsCartOpen(false)}
                     onIncrement={(foodId) => updateQuantity(foodId, 1)}
@@ -190,6 +201,7 @@ export default function Menu({ categories, foods }: MenuProps) {
             {selectedFood ? (
                 <ProductModal
                     food={selectedFood}
+                    language={language}
                     quantity={quantities[selectedFood.id] ?? 0}
                     onClose={() => setSelectedFood(null)}
                     onIncrement={() => updateQuantity(selectedFood.id, 1)}
@@ -200,6 +212,37 @@ export default function Menu({ categories, foods }: MenuProps) {
     );
 }
 
+function LanguageSwitch({
+    language,
+    onChange,
+}: {
+    language: MenuLanguage;
+    onChange: (language: MenuLanguage) => void;
+}) {
+    return (
+        <div
+            aria-label="Menu language"
+            className="grid h-11 grid-cols-2 overflow-hidden rounded-full border border-border bg-paper p-1 shadow-sm"
+            role="group"
+        >
+            {(['vi', 'en'] as const).map((option) => (
+                <button
+                    key={option}
+                    type="button"
+                    aria-pressed={language === option}
+                    onClick={() => onChange(option)}
+                    className={`min-w-11 rounded-full px-3 text-sm font-semibold transition focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none ${
+                        language === option
+                            ? 'bg-olive text-white shadow-sm'
+                            : 'text-olive hover:bg-surface'
+                    }`}
+                >
+                    {option === 'vi' ? 'VI' : 'EN'}
+                </button>
+            ))}
+        </div>
+    );
+}
 function CategoryButton({
     category,
     isActive,
@@ -234,17 +277,22 @@ function CategoryButton({
 
 function ProductCard({
     food,
+    language,
     quantity,
     onOpen,
     onIncrement,
     onDecrement,
 }: {
     food: Food;
+    language: MenuLanguage;
     quantity: number;
     onOpen: () => void;
     onIncrement: () => void;
     onDecrement: () => void;
 }) {
+    const foodName = getFoodName(food, language);
+    const foodDescription = getFoodDescription(food, language);
+
     return (
         <article
             role="button"
@@ -261,7 +309,7 @@ function ProductCard({
             <div className="relative overflow-hidden bg-paper">
                 <img
                     src={food.image_url}
-                    alt={food.name}
+                    alt={foodName}
                     className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                     loading="lazy"
                 />
@@ -273,10 +321,10 @@ function ProductCard({
             <div className="flex min-h-56 flex-col gap-3 p-4">
                 <div className="flex flex-1 flex-col gap-2">
                     <h2 className="text-lg leading-tight font-semibold">
-                        {food.name}
+                        {foodName}
                     </h2>
                     <p className="line-clamp-2 text-sm leading-5 text-muted">
-                        {food.ingredients}
+                        {foodDescription}
                     </p>
                 </div>
 
@@ -349,17 +397,22 @@ function QuantityStepper({
 
 function ProductModal({
     food,
+    language,
     quantity,
     onClose,
     onIncrement,
     onDecrement,
 }: {
     food: Food;
+    language: MenuLanguage;
     quantity: number;
     onClose: () => void;
     onIncrement: () => void;
     onDecrement: () => void;
 }) {
+    const foodName = getFoodName(food, language);
+    const foodDescription = getFoodDescription(food, language);
+
     return (
         <div
             role="presentation"
@@ -376,7 +429,7 @@ function ProductModal({
                 <div className="h-64 bg-paper sm:h-full">
                     <img
                         src={food.image_url}
-                        alt={food.name}
+                        alt={foodName}
                         className="h-full w-full object-cover"
                     />
                 </div>
@@ -391,7 +444,7 @@ function ProductModal({
                                 id="product-modal-title"
                                 className="mt-1 text-2xl leading-tight font-semibold"
                             >
-                                {food.name}
+                                {foodName}
                             </h2>
                         </div>
                         <button
@@ -404,7 +457,7 @@ function ProductModal({
                         </button>
                     </div>
 
-                    <p className="leading-6 text-muted">{food.ingredients}</p>
+                    <p className="leading-6 text-muted">{foodDescription}</p>
 
                     <div className="mt-auto flex flex-col gap-4">
                         <div className="rounded-lg border border-wine/15 bg-wine px-4 py-3 text-xl font-semibold text-white shadow-sm">
@@ -424,12 +477,14 @@ function ProductModal({
 
 function CartDrawer({
     items,
+    language,
     totalVnd,
     onClose,
     onIncrement,
     onDecrement,
 }: {
     items: CartItem[];
+    language: MenuLanguage;
     totalVnd: number;
     onClose: () => void;
     onIncrement: (foodId: number) => void;
@@ -481,7 +536,7 @@ function CartDrawer({
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
                                             <h3 className="leading-tight font-semibold">
-                                                {food.name}
+                                                {getFoodName(food, language)}
                                             </h3>
                                             <p className="mt-1 text-xs font-semibold text-olive">
                                                 Unit: {food.formatted_price}
@@ -586,6 +641,21 @@ function CloseIcon() {
     );
 }
 
+function getFoodName(food: Food, language: MenuLanguage): string {
+    if (language === 'vi') {
+        return food.vietnamese_name || food.name;
+    }
+
+    return food.name;
+}
+
+function getFoodDescription(food: Food, language: MenuLanguage): string {
+    if (language === 'vi') {
+        return food.vietnamese_description || food.ingredients;
+    }
+
+    return food.ingredients;
+}
 function formatVnd(value: number): string {
     return new Intl.NumberFormat('vi-VN', {
         currency: 'VND',
