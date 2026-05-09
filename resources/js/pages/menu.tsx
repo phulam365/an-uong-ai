@@ -1,5 +1,11 @@
-import { Head } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { Head, Link } from '@inertiajs/react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+    show as showChatMessage,
+    store as storeChatMessage,
+} from '@/actions/App/Http/Controllers/ChatMessageController';
+import ChatSessionController from '@/actions/App/Http/Controllers/ChatSessionController';
+import { success as orderSuccess } from '@/routes/order';
 
 interface Category {
     key: string;
@@ -29,6 +35,26 @@ interface MenuProps {
 interface CartItem {
     food: Food;
     quantity: number;
+}
+
+interface ChatCartAction {
+    food_id: number;
+    menu_code: string;
+    quantity_delta: number;
+}
+
+interface ChatTurnResponse {
+    turn_id: number;
+    status: 'pending' | 'processing' | 'completed' | 'failed';
+    reply: string | null;
+    cart_actions: ChatCartAction[];
+    error: string | null;
+}
+
+interface ChatMessage {
+    id: string;
+    role: 'assistant' | 'user';
+    text: string;
 }
 
 type MenuLanguage = 'vi' | 'en';
@@ -208,7 +234,216 @@ export default function Menu({ categories, foods }: MenuProps) {
                     onDecrement={() => updateQuantity(selectedFood.id, -1)}
                 />
             ) : null}
+
+            <MenuChat
+                quantities={quantities}
+                language={language}
+                onCartAction={(foodId, quantityDelta) =>
+                    updateQuantity(foodId, quantityDelta)
+                }
+            />
         </>
+    );
+}
+
+function MenuChat({
+    quantities,
+    language,
+    onCartAction,
+}: {
+    quantities: Record<number, number>;
+    language: MenuLanguage;
+    onCartAction: (foodId: number, quantityDelta: number) => void;
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+    const hasStartedSession = useRef(false);
+    const [input, setInput] = useState('');
+    const [isSending, setIsSending] = useState(false);
+    const [messages, setMessages] = useState<ChatMessage[]>([
+        {
+            id: 'welcome',
+            role: 'assistant',
+            text: 'Bạn muốn ăn gì hôm nay? Mình có thể gợi ý và thêm món vào giỏ.',
+        },
+    ]);
+
+    useEffect(() => {
+        if (!isOpen || hasStartedSession.current) {
+            return;
+        }
+
+        hasStartedSession.current = true;
+
+        postJson(ChatSessionController.url(), { language }).catch(() => {
+            setMessages((current) => [
+                ...current,
+                {
+                    id: createMessageId(),
+                    role: 'assistant',
+                    text: 'Mình chưa mở được phiên chat. Vui lòng thử lại.',
+                },
+            ]);
+        });
+    }, [isOpen, language]);
+
+    const submitMessage = async (): Promise<void> => {
+        const message = input.trim();
+
+        if (!message || isSending) {
+            return;
+        }
+
+        setInput('');
+        setIsSending(true);
+        setMessages((current) => [
+            ...current,
+            {
+                id: createMessageId(),
+                role: 'user',
+                text: message,
+            },
+        ]);
+
+        try {
+            const response = await postJson<ChatTurnResponse>(
+                storeChatMessage.url(),
+                {
+                    message,
+                    cart: cartPayload(quantities),
+                    language,
+                },
+            );
+
+            await handleTurnResponse(response);
+        } catch {
+            setMessages((current) => [
+                ...current,
+                {
+                    id: createMessageId(),
+                    role: 'assistant',
+                    text: 'Mình chưa gửi được tin nhắn. Vui lòng thử lại.',
+                },
+            ]);
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    const handleTurnResponse = async (
+        response: ChatTurnResponse,
+    ): Promise<void> => {
+        if (response.status === 'pending' || response.status === 'processing') {
+            const completedResponse = await pollTurn(response.turn_id);
+            applyChatResponse(completedResponse);
+
+            return;
+        }
+
+        applyChatResponse(response);
+    };
+
+    const applyChatResponse = (response: ChatTurnResponse): void => {
+        setMessages((current) => [
+            ...current,
+            {
+                id: createMessageId(),
+                role: 'assistant',
+                text:
+                    response.reply ||
+                    response.error ||
+                    'Mình chưa có phản hồi phù hợp.',
+            },
+        ]);
+
+        response.cart_actions.forEach((action) => {
+            onCartAction(action.food_id, action.quantity_delta);
+        });
+    };
+
+    return (
+        <div className="fixed right-4 bottom-4 z-40 flex flex-col items-end gap-3">
+            {isOpen ? (
+                <section
+                    aria-label="Chat ordering assistant"
+                    className="flex h-[520px] max-h-[calc(100vh-7rem)] w-[calc(100vw-2rem)] max-w-[380px] flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-2xl"
+                >
+                    <div className="flex items-center justify-between gap-3 border-b border-border bg-paper px-4 py-3">
+                        <div className="min-w-0">
+                            <p className="text-xs font-semibold tracking-[0.16em] text-olive uppercase">
+                                Chat
+                            </p>
+                            <h2 className="truncate text-base font-semibold">
+                                Trợ lý gọi món
+                            </h2>
+                        </div>
+                        <button
+                            type="button"
+                            aria-label="Close chat"
+                            onClick={() => setIsOpen(false)}
+                            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border bg-surface text-olive transition hover:border-brass hover:text-wine focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
+                        >
+                            <CloseIcon />
+                        </button>
+                    </div>
+
+                    <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-3">
+                        {messages.map((message) => (
+                            <div
+                                key={message.id}
+                                className={`max-w-[86%] rounded-lg px-3 py-2 text-sm leading-5 ${
+                                    message.role === 'user'
+                                        ? 'ml-auto bg-olive text-white'
+                                        : 'mr-auto border border-border bg-paper text-ink'
+                                }`}
+                            >
+                                {message.text}
+                            </div>
+                        ))}
+                        {isSending ? (
+                            <div className="mr-auto rounded-lg border border-border bg-paper px-3 py-2 text-sm text-muted">
+                                Đang trả lời...
+                            </div>
+                        ) : null}
+                    </div>
+
+                    <form
+                        className="border-t border-border bg-paper p-3"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            void submitMessage();
+                        }}
+                    >
+                        <div className="grid grid-cols-[1fr_44px] gap-2">
+                            <input
+                                value={input}
+                                onChange={(event) =>
+                                    setInput(event.target.value)
+                                }
+                                placeholder="Nhập món hoặc khẩu vị..."
+                                className="h-11 min-w-0 rounded-full border border-border bg-surface px-4 text-sm transition outline-none placeholder:text-muted focus:border-olive focus:ring-4 focus:ring-wine/20"
+                            />
+                            <button
+                                type="submit"
+                                aria-label="Send message"
+                                disabled={isSending || input.trim() === ''}
+                                className="grid h-11 w-11 place-items-center rounded-full border border-olive bg-olive text-white shadow-sm transition hover:bg-olive-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:border-border disabled:bg-border"
+                            >
+                                <SendIcon />
+                            </button>
+                        </div>
+                    </form>
+                </section>
+            ) : null}
+
+            <button
+                type="button"
+                aria-label={isOpen ? 'Close chat' : 'Open chat'}
+                onClick={() => setIsOpen((current) => !current)}
+                className="grid h-14 w-14 place-items-center rounded-full border border-olive bg-olive text-white shadow-xl transition hover:-translate-y-0.5 hover:bg-olive-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
+            >
+                {isOpen ? <CloseIcon /> : <ChatIcon />}
+            </button>
+        </div>
     );
 }
 
@@ -243,6 +478,7 @@ function LanguageSwitch({
         </div>
     );
 }
+
 function CategoryButton({
     category,
     isActive,
@@ -304,7 +540,7 @@ function ProductCard({
                     onOpen();
                 }
             }}
-            className="group grid cursor-pointer grid-rows-[160px_1fr] overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition outline-none hover:-translate-y-0.5 hover:border-brass hover:shadow-md focus-visible:ring-4 focus-visible:ring-wine/20"
+            className="group grid cursor-pointer grid-rows-[220px_1fr] overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition outline-none hover:-translate-y-0.5 hover:border-brass hover:shadow-md focus-visible:ring-4 focus-visible:ring-wine/20"
         >
             <div className="relative overflow-hidden bg-paper">
                 <img
@@ -328,20 +564,29 @@ function ProductCard({
                     </p>
                 </div>
 
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-3">
                     <p className="text-base font-semibold text-wine">
                         {food.formatted_price}
                     </p>
-                    <button
-                        type="button"
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            onOpen();
-                        }}
-                        className="rounded-full border border-border px-3 py-1 text-sm font-semibold text-olive transition hover:border-brass hover:bg-paper focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
-                    >
-                        View
-                    </button>
+                    <div className="grid grid-cols-2 gap-2">
+                        <button
+                            type="button"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                onOpen();
+                            }}
+                            className="rounded-full border border-border px-3 py-1.5 text-sm font-semibold text-olive transition hover:border-brass hover:bg-paper focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
+                        >
+                            View
+                        </button>
+                        <Link
+                            href={orderSuccess.url()}
+                            onClick={(event) => event.stopPropagation()}
+                            className="rounded-full border border-wine bg-wine px-3 py-1.5 text-center text-sm font-semibold text-white shadow-sm transition hover:border-wine-dark hover:bg-wine-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
+                        >
+                            Order
+                        </Link>
+                    </div>
                 </div>
 
                 <QuantityStepper
@@ -641,25 +886,159 @@ function CloseIcon() {
     );
 }
 
+function ChatIcon() {
+    return (
+        <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="h-6 w-6"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+        >
+            <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+        </svg>
+    );
+}
+
+function SendIcon() {
+    return (
+        <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2.2"
+        >
+            <path d="m22 2-7 20-4-9-9-4Z" />
+            <path d="M22 2 11 13" />
+        </svg>
+    );
+}
+
 function getFoodName(food: Food, language: MenuLanguage): string {
-    if (language === 'vi') {
-        return food.vietnamese_name || food.name;
+    if (language === 'en') {
+        return food.name;
     }
 
-    return food.name;
+    return food.vietnamese_name || food.name;
 }
 
 function getFoodDescription(food: Food, language: MenuLanguage): string {
-    if (language === 'vi') {
-        return food.vietnamese_description || food.ingredients;
+    if (language === 'en') {
+        return food.ingredients;
     }
 
-    return food.ingredients;
+    return food.vietnamese_description || food.ingredients;
 }
+
 function formatVnd(value: number): string {
     return new Intl.NumberFormat('vi-VN', {
         currency: 'VND',
         maximumFractionDigits: 0,
         style: 'currency',
     }).format(value);
+}
+
+function cartPayload(quantities: Record<number, number>) {
+    return Object.entries(quantities)
+        .map(([foodId, quantity]) => ({
+            food_id: Number(foodId),
+            quantity,
+        }))
+        .filter((item) => item.quantity > 0);
+}
+
+async function pollTurn(turnId: number): Promise<ChatTurnResponse> {
+    const deadline = Date.now() + 45_000;
+
+    while (Date.now() < deadline) {
+        await delay(1_000);
+
+        const response = await getJson<ChatTurnResponse>(
+            showChatMessage.url(turnId),
+        );
+
+        if (response.status !== 'pending' && response.status !== 'processing') {
+            return response;
+        }
+    }
+
+    return {
+        turn_id: turnId,
+        status: 'failed',
+        reply: 'Mình vẫn đang chờ kết nối trợ lý. Vui lòng thử lại sau.',
+        cart_actions: [],
+        error: 'Timed out waiting for chat turn.',
+    };
+}
+
+async function postJson<T = unknown>(url: string, body?: unknown): Promise<T> {
+    const response = await fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            ...csrfHeader(),
+        },
+        body: body === undefined ? '{}' : JSON.stringify(body),
+    });
+
+    const payload = (await response.json()) as T;
+
+    if (!response.ok) {
+        throw payload;
+    }
+
+    return payload;
+}
+
+async function getJson<T>(url: string): Promise<T> {
+    const response = await fetch(url, {
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    });
+
+    const payload = (await response.json()) as T;
+
+    if (!response.ok) {
+        throw payload;
+    }
+
+    return payload;
+}
+
+function csrfHeader(): Record<string, string> {
+    const token = document.cookie
+        .split('; ')
+        .find((cookie) => cookie.startsWith('XSRF-TOKEN='))
+        ?.split('=')[1];
+
+    if (!token) {
+        return {};
+    }
+
+    return {
+        'X-XSRF-TOKEN': decodeURIComponent(token),
+    };
+}
+
+function createMessageId(): string {
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function delay(milliseconds: number): Promise<void> {
+    return new Promise((resolve) => {
+        window.setTimeout(resolve, milliseconds);
+    });
 }
