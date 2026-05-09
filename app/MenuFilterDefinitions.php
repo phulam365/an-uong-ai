@@ -12,7 +12,6 @@ class MenuFilterDefinitions
     public static function propertyFilters(): array
     {
         return [
-            ['key' => 'vegetarian', 'labels' => ['en' => 'Vegetarian', 'vi' => 'Món chay']],
             ['key' => 'tourist_favorite', 'labels' => ['en' => 'Tourist favorite', 'vi' => 'Du khách yêu thích']],
             ['key' => 'adventurous', 'labels' => ['en' => 'Adventurous', 'vi' => 'Đậm vị khám phá']],
             ['key' => 'healthy', 'labels' => ['en' => 'Healthy', 'vi' => 'Thanh nhẹ']],
@@ -23,7 +22,6 @@ class MenuFilterDefinitions
             ['key' => 'contains_beef', 'labels' => ['en' => 'Beef', 'vi' => 'Có thịt bò']],
             ['key' => 'contains_seafood', 'labels' => ['en' => 'Seafood', 'vi' => 'Có hải sản']],
             ['key' => 'contains_nuts', 'labels' => ['en' => 'Nuts', 'vi' => 'Có đậu phộng']],
-            ['key' => 'contains_dairy', 'labels' => ['en' => 'Dairy', 'vi' => 'Có sữa']],
         ];
     }
 

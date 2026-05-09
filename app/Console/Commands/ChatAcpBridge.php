@@ -12,7 +12,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Throwable;
 
-#[Signature('chat:acp-bridge {--idle-timeout=900} {--poll=1} {--turn-timeout=90}')]
+#[Signature('chat:acp-bridge {--idle-timeout=900} {--poll=1} {--turn-timeout=90} {--standby-without-key}')]
 #[Description('Run the local Codex ACP bridge for menu chat turns')]
 class ChatAcpBridge extends Command
 {
@@ -44,6 +44,14 @@ class ChatAcpBridge extends Command
     {
         if (! $this->hasApiKey()) {
             $this->error('Set CODEX_API_KEY or OPENAI_API_KEY before running chat:acp-bridge.');
+
+            if ($this->option('standby-without-key')) {
+                $this->warn('Chat ACP bridge is standing by without an API key. Restart after adding a key.');
+
+                while (true) {
+                    sleep(max((int) $this->option('poll'), 1));
+                }
+            }
 
             return self::FAILURE;
         }
@@ -486,10 +494,10 @@ class ChatAcpBridge extends Command
             'Examples:',
             'Customer: add one beef pho -> reply in English, add the matching pho item.',
             'Customer: thêm một phở bò -> reply in Vietnamese, add the matching pho item.',
-            'Customer: show vegetarian food -> filter_action category food, property_keys ["vegetarian"].',
-            'Customer: hiện món chay -> filter_action category food, property_keys ["vegetarian"].',
+            'Customer: show healthy food -> filter_action category food, property_keys ["healthy"].',
+            'Customer: hiện món thanh nhẹ -> filter_action category food, property_keys ["healthy"].',
             'All future replies must be pure JSON, no Markdown, in the exact format: {"reply":"...","cart_actions":[{"menu_code":"pho_bo_01","quantity_delta":1}],"filter_action":null}',
-            'filter_action shape when present: {"category":"food","property_keys":["vegetarian"]}',
+            'filter_action shape when present: {"category":"food","property_keys":["healthy"]}',
             '',
             'ALLOWED_FILTERS_JSON:',
             $this->allowedFiltersJson(),
@@ -536,13 +544,11 @@ class ChatAcpBridge extends Command
                 'subcategory' => $food->subcategory,
                 'protein' => $food->protein,
                 'spiciness' => $food->spiciness,
-                'vegetarian' => $food->vegetarian,
                 'halal_friendly' => $food->halal_friendly,
                 'contains_pork' => $food->contains_pork,
                 'contains_beef' => $food->contains_beef,
                 'contains_seafood' => $food->contains_seafood,
                 'contains_nuts' => $food->contains_nuts,
-                'contains_dairy' => $food->contains_dairy,
                 'tourist_favorite' => $food->tourist_favorite,
                 'adventurous' => $food->adventurous,
                 'healthy' => $food->healthy,
@@ -603,11 +609,15 @@ class ChatAcpBridge extends Command
         $filterContext = is_array($turn->filter_context) ? $turn->filter_context : [];
         $category = $filterContext['category'] ?? null;
         $propertyKeys = $filterContext['property_keys'] ?? [];
+        $allowedPropertyKeys = MenuFilterDefinitions::propertyKeys();
 
         return [
-            'category' => is_string($category) ? $category : null,
+            'category' => is_string($category) && in_array($category, MenuFilterDefinitions::categoryKeys(), true) ? $category : null,
             'property_keys' => is_array($propertyKeys)
-                ? array_values(array_filter($propertyKeys, fn (mixed $key): bool => is_string($key)))
+                ? array_values(array_filter(
+                    $propertyKeys,
+                    fn (mixed $key): bool => is_string($key) && in_array($key, $allowedPropertyKeys, true),
+                ))
                 : [],
         ];
     }

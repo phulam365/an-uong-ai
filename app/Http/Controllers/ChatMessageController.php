@@ -28,13 +28,18 @@ class ChatMessageController extends Controller
             'last_used_at' => now(),
         ])->save();
 
+        $assistantConfigurationError = $this->assistantConfigurationError();
+
         $turn = $chatSession->turns()->create([
-            'status' => 'pending',
+            'status' => $assistantConfigurationError ? 'failed' : 'pending',
             'user_message' => $validated['message'],
             'cart_context' => $validated['cart'] ?? [],
             'filter_context' => $validated['filter_context'] ?? null,
+            'reply' => $this->assistantUnavailableReply($validated['message'], $assistantConfigurationError),
             'cart_actions' => [],
             'filter_action' => null,
+            'error' => $assistantConfigurationError,
+            'completed_at' => $assistantConfigurationError ? now() : null,
         ]);
 
         $turn = $this->waitForTurn($turn);
@@ -67,5 +72,67 @@ class ChatMessageController extends Controller
         } while (microtime(true) < $deadline);
 
         return $turn->refresh();
+    }
+
+    private function assistantConfigurationError(): ?string
+    {
+        if (! filled(config('services.codex_acp.codex_api_key')) && ! filled(config('services.codex_acp.openai_api_key'))) {
+            return 'Set CODEX_API_KEY or OPENAI_API_KEY to enable the ordering assistant.';
+        }
+
+        $binary = (string) config('services.codex_acp.binary');
+
+        if (! is_file($binary)) {
+            return "Codex ACP binary was not found at {$binary}. Run npm install first.";
+        }
+
+        return null;
+    }
+
+    private function assistantUnavailableReply(string $message, ?string $assistantConfigurationError): ?string
+    {
+        if (! $assistantConfigurationError) {
+            return null;
+        }
+
+        return $this->detectMessageLanguage($message) === 'vi'
+            ? 'Trợ lý gọi món chưa được cấu hình. Vui lòng thêm CODEX_API_KEY hoặc OPENAI_API_KEY rồi khởi động lại môi trường dev.'
+            : 'The ordering assistant is not configured yet. Add CODEX_API_KEY or OPENAI_API_KEY, then restart the dev environment.';
+    }
+
+    private function detectMessageLanguage(string $message): string
+    {
+        $message = mb_strtolower($message);
+
+        if (preg_match('/[ăâđêôơưáàảãạắằẳẵặấầẩẫậéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]/u', $message) === 1) {
+            return 'vi';
+        }
+
+        $vietnameseMarkers = [
+            'anh',
+            'cho',
+            'chay',
+            'com',
+            'cua',
+            'do',
+            'em',
+            'ga',
+            'goi',
+            'hien',
+            'khong',
+            'mon',
+            'mot',
+            'nuoc',
+            'pho',
+            'thit',
+            'them',
+            'toi',
+            'tra',
+        ];
+
+        $words = preg_split('/[^a-z]+/u', $message) ?: [];
+        $matches = count(array_intersect($vietnameseMarkers, $words));
+
+        return $matches >= 2 ? 'vi' : 'en';
     }
 }
