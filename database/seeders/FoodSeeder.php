@@ -66,7 +66,7 @@ class FoodSeeder extends Seeder
                 'keywords' => 'herbal,light,classic,comforting',
                 'recommendation_reason' => 'A light and comforting Vietnamese classic that is beginner friendly',
                 'price_vnd' => 65000,
-                'image_path' => 'menu/crispy-rice-chicken.png',
+                'image_path' => 'menu/pho-bo.png',
             ],
             [
                 'menu_code' => 'banh_mi_01',
@@ -105,7 +105,7 @@ class FoodSeeder extends Seeder
                 'keywords' => 'crispy,savory,portable,street food',
                 'recommendation_reason' => 'Perfect for a quick and flavorful Vietnamese street food experience',
                 'price_vnd' => 30000,
-                'image_path' => 'menu/garden-egg-wrap.png',
+                'image_path' => 'menu/banh-mi.png',
             ],
             [
                 'menu_code' => 'bun_bo_hue_01',
@@ -144,7 +144,7 @@ class FoodSeeder extends Seeder
                 'keywords' => 'spicy,rich,bold,central vietnam',
                 'recommendation_reason' => 'A bold and spicy noodle soup for users seeking strong Vietnamese flavors',
                 'price_vnd' => 70000,
-                'image_path' => 'menu/chili-lime-nuggets.png',
+                'image_path' => 'menu/bun-bo-hue.png',
             ],
             [
                 'menu_code' => 'mi_quang_01',
@@ -183,7 +183,7 @@ class FoodSeeder extends Seeder
                 'keywords' => 'turmeric,herbal,central vietnam,rich',
                 'recommendation_reason' => 'A flavorful central Vietnamese noodle dish with rich textures and herbs',
                 'price_vnd' => 65000,
-                'image_path' => 'menu/golden-fries-cup.png',
+                'image_path' => 'menu/mi-quang.png',
             ],
             [
                 'menu_code' => 'com_tam_01',
@@ -222,7 +222,7 @@ class FoodSeeder extends Seeder
                 'keywords' => 'grilled,savory,saigon classic,comforting',
                 'recommendation_reason' => 'A classic Saigon comfort meal loved by both locals and tourists',
                 'price_vnd' => 55000,
-                'image_path' => 'menu/double-sizzle-burger.png',
+                'image_path' => 'menu/com-tam.png',
             ],
             [
                 'menu_code' => 'bun_cha_01',
@@ -261,7 +261,7 @@ class FoodSeeder extends Seeder
                 'keywords' => 'hanoi,grilled,fresh,balanced',
                 'recommendation_reason' => 'A balanced and beginner friendly Hanoi specialty with grilled flavors',
                 'price_vnd' => 65000,
-                'image_path' => 'menu/crispy-rice-chicken.png',
+                'image_path' => 'menu/bun-cha.png',
             ],
             [
                 'menu_code' => 'hu_tieu_01',
@@ -300,7 +300,7 @@ class FoodSeeder extends Seeder
                 'keywords' => 'southern vietnam,light,noodle soup,comforting',
                 'recommendation_reason' => 'A light and comforting southern Vietnamese noodle soup perfect for casual meals',
                 'price_vnd' => 50000,
-                'image_path' => 'menu/garden-egg-wrap.png',
+                'image_path' => 'menu/hu-tieu.png',
             ],
             [
                 'menu_code' => 'ca_phe_sua_da_01',
@@ -378,7 +378,7 @@ class FoodSeeder extends Seeder
                 'keywords' => 'sweet,milky,coffee,gentle',
                 'recommendation_reason' => 'A sweeter and lighter coffee choice ideal for beginners',
                 'price_vnd' => 35000,
-                'image_path' => 'menu/mango-yogurt-shake.png',
+                'image_path' => 'menu/bac-xiu.png',
             ],
             [
                 'menu_code' => 'tra_sua_tran_chau_01',
@@ -417,7 +417,7 @@ class FoodSeeder extends Seeder
                 'keywords' => 'bubble tea,sweet,trendy,chewy',
                 'recommendation_reason' => 'A fun and sweet drink with chewy pearls loved by younger customers',
                 'price_vnd' => 50000,
-                'image_path' => 'menu/sparkling-lychee.png',
+                'image_path' => 'menu/bubble-milk-tea.png',
             ],
             [
                 'menu_code' => 'matcha_latte_01',
@@ -456,7 +456,7 @@ class FoodSeeder extends Seeder
                 'keywords' => 'matcha,earthy,creamy,trendy',
                 'recommendation_reason' => 'A smooth and modern green tea drink popular among cafe visitors',
                 'price_vnd' => 55000,
-                'image_path' => 'menu/iced-citrus-tea.png',
+                'image_path' => 'menu/matcha-latte.png',
             ],
             [
                 'menu_code' => 'nuoc_mia_01',
@@ -495,7 +495,7 @@ class FoodSeeder extends Seeder
                 'keywords' => 'refreshing,natural,sweet,tropical',
                 'recommendation_reason' => 'A refreshing tropical street drink perfect for hot Vietnamese weather',
                 'price_vnd' => 25000,
-                'image_path' => 'menu/berry-fizz.png',
+                'image_path' => 'menu/sugarcane-juice.png',
             ],
         ])->each(function (array $food, int $index): void {
             $food['ingredients'] = $food['description'];
