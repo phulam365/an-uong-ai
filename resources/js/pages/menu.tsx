@@ -58,12 +58,19 @@ interface ChatFilterAction {
     property_keys: string[];
 }
 
+interface ChatDisplayAction {
+    type: 'show_items';
+    title: string;
+    food_ids: number[];
+}
+
 interface ChatTurnResponse {
     turn_id: number;
     status: 'pending' | 'processing' | 'completed' | 'failed';
     reply: string | null;
     cart_actions: ChatCartAction[];
     filter_action: ChatFilterAction | null;
+    display_action: ChatDisplayAction | null;
     error: string | null;
 }
 
@@ -219,7 +226,6 @@ const uiText: Record<
 export default function Menu({
     language: initialLanguage = 'vi',
     categories,
-    propertyFilters,
     foods,
 }: MenuProps) {
     const categoryOptions = useMemo<Category[]>(
@@ -236,6 +242,7 @@ export default function Menu({
     const [activeCategory, setActiveCategory] =
         useState<string>(ALL_CATEGORY_KEY);
     const [activePropertyKeys, setActivePropertyKeys] = useState<string[]>([]);
+    const [aiResults, setAiResults] = useState<ChatDisplayAction | null>(null);
     const [quantities, setQuantities] = useState<Record<number, number>>({});
     const [selectedFood, setSelectedFood] = useState<Food | null>(null);
     const [isCartOpen, setIsCartOpen] = useState(false);
@@ -250,20 +257,6 @@ export default function Menu({
         window.history.replaceState(window.history.state, '', url);
     };
 
-    const propertyCountsByCategory = useMemo(() => {
-        const counts = new Map<string, number>();
-
-        foods
-            .filter((food) => matchesActiveCategory(food, activeCategory))
-            .forEach((food) => {
-                food.property_keys.forEach((propertyKey) => {
-                    counts.set(propertyKey, (counts.get(propertyKey) ?? 0) + 1);
-                });
-            });
-
-        return counts;
-    }, [activeCategory, foods]);
-
     const visibleFoods = useMemo(
         () =>
             foods.filter(
@@ -275,6 +268,21 @@ export default function Menu({
             ),
         [activeCategory, activePropertyKeys, foods],
     );
+
+    const foodsById = useMemo(
+        () => new Map(foods.map((food) => [food.id, food])),
+        [foods],
+    );
+
+    const displayedFoods = useMemo(() => {
+        if (!aiResults) {
+            return visibleFoods;
+        }
+
+        return aiResults.food_ids
+            .map((foodId) => foodsById.get(foodId))
+            .filter((food): food is Food => food !== undefined);
+    }, [aiResults, foodsById, visibleFoods]);
 
     const cartItems = useMemo<CartItem[]>(
         () =>
@@ -296,10 +304,7 @@ export default function Menu({
         [cartItems],
     );
 
-    const cartQuantity = useMemo(
-        () => cartItems.reduce((total, item) => total + item.quantity, 0),
-        [cartItems],
-    );
+    const cartItemCount = cartItems.length;
 
     useEffect(() => {
         if (!selectedFood && !isCartOpen) {
@@ -339,12 +344,10 @@ export default function Menu({
         });
     };
 
-    const togglePropertyFilter = (propertyKey: string): void => {
-        setActivePropertyKeys((current) =>
-            current.includes(propertyKey)
-                ? current.filter((key) => key !== propertyKey)
-                : [...current, propertyKey],
-        );
+    const selectCategory = (category: string): void => {
+        setAiResults(null);
+        setActiveCategory(category);
+        setActivePropertyKeys([]);
     };
 
     return (
@@ -354,10 +357,12 @@ export default function Menu({
                 <div className="border-b border-border bg-surface/95 shadow-sm">
                     <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:px-8">
                         <div className="flex items-center justify-between gap-4">
-                            <div>
-                                <h1 className="text-2xl leading-tight font-semibold sm:text-3xl">
-                                    {t.heroTitle}
-                                </h1>
+                            <div className="min-w-0">
+                                <img
+                                    src="/logo.webp"
+                                    alt={t.heroTitle}
+                                    className="h-20 w-auto max-w-[min(70vw,480px)] object-contain sm:h-24"
+                                />
                             </div>
 
                             <div className="flex shrink-0 items-center gap-2">
@@ -368,19 +373,19 @@ export default function Menu({
                                 <button
                                     type="button"
                                     aria-label={
-                                        cartQuantity > 0
-                                            ? t.openCartWithItems(cartQuantity)
+                                        cartItemCount > 0
+                                            ? t.openCartWithItems(cartItemCount)
                                             : t.openCart
                                     }
                                     onClick={() => setIsCartOpen(true)}
                                     className="relative grid h-11 w-11 place-items-center rounded-full border border-border bg-paper text-olive shadow-sm transition hover:-translate-y-0.5 hover:border-brass hover:text-olive-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
                                 >
                                     <CartIcon />
-                                    {cartQuantity > 0 ? (
+                                    {cartItemCount > 0 ? (
                                         <span className="absolute -top-1.5 -right-1.5 grid min-h-5 min-w-5 place-items-center rounded-full border-2 border-surface bg-wine px-1 text-[11px] leading-none font-semibold text-white">
-                                            {cartQuantity > 99
+                                            {cartItemCount > 99
                                                 ? '99+'
-                                                : cartQuantity}
+                                                : cartItemCount}
                                         </span>
                                     ) : null}
                                 </button>
@@ -394,35 +399,10 @@ export default function Menu({
                                     category={category}
                                     language={language}
                                     isActive={activeCategory === category.key}
-                                    onClick={() =>
-                                        setActiveCategory(category.key)
-                                    }
+                                    onClick={() => selectCategory(category.key)}
                                 />
                             ))}
                         </div>
-
-                        {propertyFilters.length > 0 ? (
-                            <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
-                                {propertyFilters.map((filter) => (
-                                    <PropertyFilterButton
-                                        key={filter.key}
-                                        filter={filter}
-                                        language={language}
-                                        count={
-                                            propertyCountsByCategory.get(
-                                                filter.key,
-                                            ) ?? 0
-                                        }
-                                        isActive={activePropertyKeys.includes(
-                                            filter.key,
-                                        )}
-                                        onClick={() =>
-                                            togglePropertyFilter(filter.key)
-                                        }
-                                    />
-                                ))}
-                            </div>
-                        ) : null}
                     </div>
                 </div>
 
@@ -438,75 +418,38 @@ export default function Menu({
                                     category={category}
                                     language={language}
                                     isActive={activeCategory === category.key}
-                                    onClick={() =>
-                                        setActiveCategory(category.key)
-                                    }
+                                    onClick={() => selectCategory(category.key)}
                                 />
                             ))}
                         </div>
-
-                        {propertyFilters.length > 0 ? (
-                            <>
-                                <div className="my-4 border-t border-border" />
-                                <div className="flex items-center justify-between gap-3 px-2">
-                                    <p className="text-xs font-semibold tracking-[0.16em] text-olive uppercase">
-                                        {t.filterBy}
-                                    </p>
-                                    {activePropertyKeys.length > 0 ? (
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setActivePropertyKeys([])
-                                            }
-                                            className="text-xs font-semibold text-wine transition hover:text-wine-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
-                                        >
-                                            {t.clear}
-                                        </button>
-                                    ) : null}
-                                </div>
-                                <div className="mt-3 flex flex-col gap-2">
-                                    {propertyFilters.map((filter) => (
-                                        <PropertyFilterButton
-                                            key={filter.key}
-                                            filter={filter}
-                                            language={language}
-                                            count={
-                                                propertyCountsByCategory.get(
-                                                    filter.key,
-                                                ) ?? 0
-                                            }
-                                            isActive={activePropertyKeys.includes(
-                                                filter.key,
-                                            )}
-                                            onClick={() =>
-                                                togglePropertyFilter(filter.key)
-                                            }
-                                        />
-                                    ))}
-                                </div>
-                            </>
-                        ) : null}
                     </aside>
 
                     <div className="flex flex-col gap-4">
                         <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-semibold text-muted">
-                                {t.itemCount(visibleFoods.length)}
-                            </p>
-                            {activePropertyKeys.length > 0 ? (
+                            <div className="min-w-0">
+                                {aiResults ? (
+                                    <h2 className="truncate text-lg font-semibold">
+                                        {aiResults.title}
+                                    </h2>
+                                ) : null}
+                                <p className="text-sm font-semibold text-muted">
+                                    {t.itemCount(displayedFoods.length)}
+                                </p>
+                            </div>
+                            {aiResults ? (
                                 <button
                                     type="button"
-                                    onClick={() => setActivePropertyKeys([])}
-                                    className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-wine shadow-sm transition hover:border-wine hover:text-wine-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none lg:hidden"
+                                    onClick={() => setAiResults(null)}
+                                    className="shrink-0 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-wine shadow-sm transition hover:border-wine hover:text-wine-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
                                 >
-                                    {t.clearFilters}
+                                    {t.clear}
                                 </button>
                             ) : null}
                         </div>
 
-                        {visibleFoods.length > 0 ? (
+                        {displayedFoods.length > 0 ? (
                             <section className="grid grid-cols-1 gap-4 min-[430px]:grid-cols-2 xl:grid-cols-3">
-                                {visibleFoods.map((food) => (
+                                {displayedFoods.map((food) => (
                                     <ProductCard
                                         key={food.id}
                                         food={food}
@@ -541,7 +484,7 @@ export default function Menu({
                     items={cartItems}
                     language={language}
                     totalVnd={cartTotalVnd}
-                    cartQuantity={cartQuantity}
+                    cartItemCount={cartItemCount}
                     onClose={() => setIsCartOpen(false)}
                     onIncrement={(foodId) => updateQuantity(foodId, 1)}
                     onDecrement={(foodId) => updateQuantity(foodId, -1)}
@@ -568,8 +511,13 @@ export default function Menu({
                     updateQuantity(foodId, quantityDelta)
                 }
                 onFilterAction={(filterAction) => {
+                    setAiResults(null);
                     setActiveCategory(filterAction.category);
                     setActivePropertyKeys(filterAction.property_keys);
+                }}
+                onDisplayAction={(displayAction) => {
+                    setActivePropertyKeys([]);
+                    setAiResults(displayAction);
                 }}
             />
         </>
@@ -583,6 +531,7 @@ function MenuChat({
     language,
     onCartAction,
     onFilterAction,
+    onDisplayAction,
 }: {
     quantities: Record<number, number>;
     activeCategory: string;
@@ -590,6 +539,7 @@ function MenuChat({
     language: MenuLanguage;
     onCartAction: (foodId: number, quantityDelta: number) => void;
     onFilterAction: (filterAction: ChatFilterAction) => void;
+    onDisplayAction: (displayAction: ChatDisplayAction) => void;
 }) {
     const t = uiText[language];
     const [isOpen, setIsOpen] = useState(false);
@@ -695,6 +645,12 @@ function MenuChat({
             onCartAction(action.food_id, action.quantity_delta);
         });
 
+        if (response.display_action) {
+            onDisplayAction(response.display_action);
+
+            return;
+        }
+
         if (response.filter_action) {
             onFilterAction(response.filter_action);
         }
@@ -736,7 +692,7 @@ function MenuChat({
                                         : 'mr-auto border border-border bg-paper text-ink'
                                 }`}
                             >
-                                {message.text}
+                                {renderChatText(message.text)}
                             </div>
                         ))}
                         {isSending ? (
@@ -859,45 +815,6 @@ function CategoryButton({
                 }`}
             >
                 {category.count}
-            </span>
-        </button>
-    );
-}
-
-function PropertyFilterButton({
-    filter,
-    language,
-    count,
-    isActive,
-    onClick,
-}: {
-    filter: PropertyFilter;
-    language: MenuLanguage;
-    count: number;
-    isActive: boolean;
-    onClick: () => void;
-}) {
-    const isDisabled = count === 0 && !isActive;
-
-    return (
-        <button
-            type="button"
-            aria-pressed={isActive}
-            disabled={isDisabled}
-            onClick={onClick}
-            className={`flex min-w-fit items-center justify-between gap-3 rounded-full border px-3 py-2 text-left text-sm font-semibold transition focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 lg:w-full lg:rounded-lg ${
-                isActive
-                    ? 'border-wine bg-wine text-white shadow-sm'
-                    : 'border-border bg-paper text-ink hover:border-brass hover:bg-surface'
-            }`}
-        >
-            <span>{localizedText(filter.labels, language)}</span>
-            <span
-                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                    isActive ? 'bg-brass text-ink' : 'bg-surface text-wine'
-                }`}
-            >
-                {count}
             </span>
         </button>
     );
@@ -1129,7 +1046,7 @@ function CartDrawer({
     items,
     language,
     totalVnd,
-    cartQuantity,
+    cartItemCount,
     onClose,
     onIncrement,
     onDecrement,
@@ -1137,7 +1054,7 @@ function CartDrawer({
     items: CartItem[];
     language: MenuLanguage;
     totalVnd: number;
-    cartQuantity: number;
+    cartItemCount: number;
     onClose: () => void;
     onIncrement: (foodId: number) => void;
     onDecrement: (foodId: number) => void;
@@ -1262,7 +1179,7 @@ function CartDrawer({
                             })}
                             className="mt-4 flex h-12 items-center justify-center rounded-full border border-wine bg-wine px-5 text-sm font-semibold text-white shadow-sm transition hover:border-wine-dark hover:bg-wine-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
                         >
-                            {t.orderItems(cartQuantity)}
+                            {t.orderItems(cartItemCount)}
                         </Link>
                     ) : null}
                 </div>
@@ -1377,6 +1294,31 @@ function welcomeChatMessage(language: MenuLanguage): ChatMessage {
     };
 }
 
+function renderChatText(text: string) {
+    const lines = text.split('\n');
+
+    return lines.map((line, lineIndex) => (
+        <span key={`${lineIndex}-${line}`}>
+            {renderChatLine(line)}
+            {lineIndex < lines.length - 1 ? <br /> : null}
+        </span>
+    ));
+}
+
+function renderChatLine(line: string) {
+    return line.split(/(\*\*[^*]+\*\*)/g).map((part, partIndex) => {
+        if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+            return (
+                <strong key={partIndex} className="font-semibold">
+                    {part.slice(2, -2)}
+                </strong>
+            );
+        }
+
+        return part;
+    });
+}
+
 function formatVnd(value: number): string {
     return new Intl.NumberFormat('vi-VN', {
         currency: 'VND',
@@ -1428,6 +1370,7 @@ async function pollTurn(
         reply: uiText[language].chatTimeout,
         cart_actions: [],
         filter_action: null,
+        display_action: null,
         error: uiText[language].chatTimeoutError,
     };
 }

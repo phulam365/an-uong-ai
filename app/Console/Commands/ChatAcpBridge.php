@@ -16,6 +16,8 @@ use Throwable;
 #[Description('Run the local Codex ACP bridge for menu chat turns')]
 class ChatAcpBridge extends Command
 {
+    private const PROMPT_VERSION = 2;
+
     /**
      * @var resource|null
      */
@@ -65,6 +67,7 @@ class ChatAcpBridge extends Command
                     'reply' => $this->fallbackConnectionReply($turn),
                     'cart_actions' => [],
                     'filter_action' => null,
+                    'display_action' => null,
                     'error' => $exception->getMessage(),
                     'completed_at' => now(),
                 ])->save();
@@ -95,12 +98,14 @@ class ChatAcpBridge extends Command
         $rawResponse = $this->decodeJsonEnvelope($responseText, $replyLanguage);
         $cartActions = $this->validatedCartActions($rawResponse['cart_actions'] ?? []);
         $filterAction = $this->validatedFilterAction($rawResponse['filter_action'] ?? null);
+        $displayAction = $this->validatedDisplayAction($rawResponse['display_action'] ?? null);
 
         $turn->forceFill([
             'status' => 'completed',
             'reply' => $this->normalizedReply($rawResponse, $responseText, $replyLanguage),
             'cart_actions' => $cartActions,
             'filter_action' => $filterAction,
+            'display_action' => $displayAction,
             'raw_response' => $rawResponse,
             'error' => null,
             'completed_at' => now(),
@@ -116,6 +121,10 @@ class ChatAcpBridge extends Command
     private function ensureAcpSession(ChatSession $chatSession): string
     {
         $this->ensureAgent();
+
+        if ($this->sessionNeedsPromptRefresh($chatSession)) {
+            $this->forgetAcpSession($chatSession);
+        }
 
         if ($chatSession->acp_session_id && isset($this->loadedAcpSessions[$chatSession->acp_session_id])) {
             return $chatSession->acp_session_id;
@@ -162,13 +171,47 @@ class ChatAcpBridge extends Command
             (int) $this->option('turn-timeout'),
         );
 
+        $metadata = is_array($chatSession->metadata) ? $chatSession->metadata : [];
+
         $chatSession->forceFill([
             'status' => 'ready',
             'warmed_at' => now(),
+            'metadata' => [
+                ...$metadata,
+                'prompt_version' => self::PROMPT_VERSION,
+            ],
             'error' => null,
         ])->save();
 
         return $acpSessionId;
+    }
+
+    private function sessionNeedsPromptRefresh(ChatSession $chatSession): bool
+    {
+        $metadata = is_array($chatSession->metadata) ? $chatSession->metadata : [];
+
+        return ($metadata['prompt_version'] ?? null) !== self::PROMPT_VERSION;
+    }
+
+    private function forgetAcpSession(ChatSession $chatSession): void
+    {
+        if ($chatSession->acp_session_id && isset($this->loadedAcpSessions[$chatSession->acp_session_id])) {
+            try {
+                $this->rpc('session/close', [
+                    'sessionId' => $chatSession->acp_session_id,
+                ], 5);
+            } catch (Throwable) {
+                //
+            }
+
+            unset($this->loadedAcpSessions[$chatSession->acp_session_id]);
+        }
+
+        $chatSession->forceFill([
+            'acp_session_id' => null,
+            'status' => 'pending',
+            'warmed_at' => null,
+        ])->save();
     }
 
     private function ensureAgent(): void
@@ -472,17 +515,26 @@ class ChatAcpBridge extends Command
             'Infer the reply language from the customer latest message on every turn. English message -> English reply. Vietnamese message -> Vietnamese reply. Mixed message -> use the dominant language in that latest message.',
             'Do not rely on a stored chat language. The same chat session can switch between English and Vietnamese without being restarted.',
             'Only suggest dishes and filters from the menu and allowed filter data below.',
+            'The menu data intentionally does not include slugs. Never mention, invent, or expose food slugs.',
             'When replying in English and mentioning dishes, use the menu item "name" value.',
             'When replying in Vietnamese and mentioning dishes, prefer "vietnamese_name" when present.',
+            'When mentioning a dish name in the reply string, wrap the visible dish name in double asterisks, for example **Beef Pho**.',
+            'When listing ingredients in the reply string, put each ingredient on its own line.',
             'When customers clearly choose dishes, return cart_actions with menu_code and quantity_delta. If quantity is missing, default to 1. If the request is unclear, unavailable, or outside the menu, do not add to the cart.',
-            'When customers ask to show/filter menu items, return filter_action using only allowed categories and property keys. If no filter change is requested, filter_action must be null.',
+            'When customers explicitly ask to switch category, such as show drinks, return filter_action using only allowed categories and property keys.',
+            'When customers ask for recommendations, search, preferences, dietary needs, flavor, ingredients, caffeine, or time-of-day suggestions such as breakfast, return display_action with menu_codes in best-match order.',
+            'Do not put recommended/search result items in filter_action. Use display_action for those result grids.',
+            'If no cart, category, or display change is requested, filter_action and display_action must be null.',
             'Examples:',
             'Customer: add one beef pho -> reply in English, add the matching pho item.',
             'Customer: thêm một phở bò -> reply in Vietnamese, add the matching pho item.',
-            'Customer: show healthy food -> filter_action category food, property_keys ["healthy"].',
-            'Customer: hiện món thanh nhẹ -> filter_action category food, property_keys ["healthy"].',
-            'All future replies must be pure JSON, no Markdown, in the exact format: {"reply":"...","cart_actions":[{"menu_code":"pho_bo_01","quantity_delta":1}],"filter_action":null}',
+            'Customer: show drinks -> filter_action category drink, property_keys [].',
+            'Customer: món gì ăn sáng được? -> display_action type show_items with title and breakfast menu_codes.',
+            'Customer: show healthy food -> display_action type show_items with title and matching healthy menu_codes.',
+            'Customer: hiện món thanh nhẹ -> display_action type show_items with title and matching healthy menu_codes.',
+            'All future replies must be pure JSON, with no Markdown outside the JSON. The reply string may use **bold dish names**. Use the exact format: {"reply":"...","cart_actions":[{"menu_code":"pho_bo_01","quantity_delta":1}],"filter_action":null,"display_action":null}',
             'filter_action shape when present: {"category":"food","property_keys":["healthy"]}',
+            'display_action shape when present: {"type":"show_items","title":"Breakfast picks","menu_codes":["pho_bo_01","hu_tieu_01"]}',
             '',
             'ALLOWED_FILTERS_JSON:',
             $this->allowedFiltersJson(),
@@ -505,10 +557,16 @@ class ChatAcpBridge extends Command
             json_encode($this->filterContextForPrompt($turn), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             '',
             'Infer reply language from the customer latest message only.',
+            'Never mention, invent, or expose food slugs.',
             'English reply: use "name" for dish names. Vietnamese reply: prefer "vietnamese_name" for dish names.',
-            'For filter requests, return filter_action with allowed category/property_keys. For no filter change, return null.',
+            'When mentioning dish names in the reply string, wrap each visible dish name in double asterisks, for example **Beef Pho**.',
+            'When listing ingredients in the reply string, put each ingredient on its own line.',
+            'Explicit ordering belongs in cart_actions.',
+            'Explicit category switches belong in filter_action with allowed category/property_keys.',
+            'Recommendations, searches, preferences, dietary needs, flavor, ingredients, caffeine, or time-of-day suggestions belong in display_action with menu_codes in best-match order.',
+            'Do not use display_action for add-to-cart requests. Do not use filter_action for recommendation/search result grids.',
             '',
-            'Return JSON only: {"reply":"...","cart_actions":[{"menu_code":"...","quantity_delta":1}],"filter_action":null}',
+            'Return JSON only: {"reply":"...","cart_actions":[{"menu_code":"...","quantity_delta":1}],"filter_action":null,"display_action":null}',
         ]);
     }
 
@@ -528,6 +586,7 @@ class ChatAcpBridge extends Command
                 'price_vnd' => $food->price_vnd,
                 'subcategory' => $food->subcategory,
                 'protein' => $food->protein,
+                'best_time' => $food->best_time,
                 'spiciness' => $food->spiciness,
                 'halal_friendly' => $food->halal_friendly,
                 'contains_pork' => $food->contains_pork,
@@ -633,6 +692,7 @@ class ChatAcpBridge extends Command
             'reply' => $responseText !== '' ? $responseText : $this->fallbackReply($language),
             'cart_actions' => [],
             'filter_action' => null,
+            'display_action' => null,
         ];
     }
 
@@ -789,6 +849,70 @@ class ChatAcpBridge extends Command
         return [
             'category' => $category,
             'property_keys' => $validatedPropertyKeys,
+        ];
+    }
+
+    /**
+     * @return array{type: 'show_items', title: string, food_ids: array<int, int>}|null
+     */
+    private function validatedDisplayAction(mixed $rawAction): ?array
+    {
+        if (! is_array($rawAction)) {
+            return null;
+        }
+
+        if (($rawAction['type'] ?? null) !== 'show_items') {
+            return null;
+        }
+
+        $menuCodes = $rawAction['menu_codes'] ?? [];
+
+        if (! is_array($menuCodes)) {
+            return null;
+        }
+
+        $validatedMenuCodes = collect($menuCodes)
+            ->filter(fn (mixed $menuCode): bool => is_string($menuCode) && trim($menuCode) !== '')
+            ->map(fn (string $menuCode): string => trim($menuCode))
+            ->unique()
+            ->take(12)
+            ->values();
+
+        if ($validatedMenuCodes->isEmpty()) {
+            return null;
+        }
+
+        $foodsByMenuCode = Food::query()
+            ->availableForMenu()
+            ->whereIn('menu_code', $validatedMenuCodes->all())
+            ->get()
+            ->keyBy('menu_code');
+
+        $foodIds = $validatedMenuCodes
+            ->map(function (string $menuCode) use ($foodsByMenuCode): ?int {
+                $food = $foodsByMenuCode->get($menuCode);
+
+                return $food instanceof Food ? $food->id : null;
+            })
+            ->filter()
+            ->unique()
+            ->take(12)
+            ->values()
+            ->all();
+
+        if ($foodIds === []) {
+            return null;
+        }
+
+        $title = $rawAction['title'] ?? null;
+        $title = is_string($title) && trim($title) !== ''
+            ? mb_substr(trim($title), 0, 120)
+            : 'Recommended items';
+
+        return [
+            'type' => 'show_items',
+            'title' => $title,
+            'food_ids' => $foodIds,
         ];
     }
 

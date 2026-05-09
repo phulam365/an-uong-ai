@@ -35,6 +35,7 @@ class ChatMessageController extends Controller
             'filter_context' => $validated['filter_context'] ?? null,
             'cart_actions' => [],
             'filter_action' => null,
+            'display_action' => null,
         ]);
 
         $turn = $this->waitForTurn($turn);
