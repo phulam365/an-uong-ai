@@ -112,15 +112,15 @@ export default function Menu({ categories, foods }: MenuProps) {
     return (
         <>
             <Head title="Menu" />
-            <main className="min-h-screen bg-[#f8f3e6] text-[#21170f]">
-                <div className="border-b-4 border-[#d71920] bg-[#ffc72c]">
-                    <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
-                        <div className="flex items-center justify-between gap-3">
+            <main className="min-h-screen bg-paper text-ink">
+                <div className="border-b border-border bg-surface/95 shadow-sm">
+                    <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:px-8">
+                        <div className="flex items-center justify-between gap-4">
                             <div>
-                                <p className="text-xs font-semibold tracking-[0.18em] text-[#8a1116] uppercase">
+                                <p className="text-xs font-semibold tracking-[0.18em] text-olive uppercase">
                                     An Uong AI Menu
                                 </p>
-                                <h1 className="text-2xl font-black sm:text-3xl">
+                                <h1 className="mt-1 text-2xl leading-tight font-semibold sm:text-3xl">
                                     Food and drinks ready to browse
                                 </h1>
                             </div>
@@ -130,13 +130,13 @@ export default function Menu({ categories, foods }: MenuProps) {
                                     type="button"
                                     aria-label="Open cart"
                                     onClick={() => setIsCartOpen(true)}
-                                    className="grid h-11 w-11 place-items-center rounded-md border-2 border-[#21170f] bg-white text-[#21170f] shadow-[3px_3px_0_#d71920] transition hover:-translate-y-0.5 hover:bg-[#fff5d0] focus-visible:ring-4 focus-visible:ring-[#d71920]/35 focus-visible:outline-none"
+                                    className="grid h-11 w-11 place-items-center rounded-full border border-border bg-paper text-olive shadow-sm transition hover:-translate-y-0.5 hover:border-brass hover:text-olive-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
                                 >
                                     <CartIcon />
                                 </button>
                                 <span
                                     aria-label={`${selectedCount} selected foods`}
-                                    className="rounded-md bg-[#21170f] px-3 py-2 text-sm font-bold whitespace-nowrap text-white"
+                                    className="rounded-full bg-wine px-3 py-2 text-sm font-semibold whitespace-nowrap text-white shadow-sm"
                                 >
                                     {selectedCount}
                                 </span>
@@ -158,9 +158,9 @@ export default function Menu({ categories, foods }: MenuProps) {
                     </div>
                 </div>
 
-                <div className="mx-auto grid max-w-7xl gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:px-8">
-                    <aside className="sticky top-5 hidden h-fit rounded-md border-2 border-[#21170f] bg-white p-3 shadow-[6px_6px_0_#d71920] lg:block">
-                        <p className="mb-3 px-2 text-xs font-black tracking-[0.16em] text-[#8a1116] uppercase">
+                <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:px-8">
+                    <aside className="sticky top-6 hidden h-fit rounded-lg border border-border bg-surface p-3 shadow-sm lg:block">
+                        <p className="mb-3 px-2 text-xs font-semibold tracking-[0.16em] text-olive uppercase">
                             Categories
                         </p>
                         <div className="flex flex-col gap-2">
@@ -168,9 +168,7 @@ export default function Menu({ categories, foods }: MenuProps) {
                                 <CategoryButton
                                     key={category.key}
                                     category={category}
-                                    isActive={
-                                        activeCategory === category.key
-                                    }
+                                    isActive={activeCategory === category.key}
                                     onClick={() =>
                                         setActiveCategory(category.key)
                                     }
@@ -231,18 +229,16 @@ function CategoryButton({
             type="button"
             aria-pressed={isActive}
             onClick={onClick}
-            className={`flex min-w-32 items-center justify-between gap-3 rounded-md border-2 px-3 py-2 text-left text-sm font-black transition ${
+            className={`flex min-w-32 items-center justify-between gap-3 rounded-full border px-3 py-2 text-left text-sm font-semibold transition focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none lg:rounded-lg ${
                 isActive
-                    ? 'border-[#21170f] bg-[#d71920] text-white shadow-[3px_3px_0_#21170f]'
-                    : 'border-[#f1d68b] bg-white text-[#21170f] hover:border-[#21170f]'
+                    ? 'border-olive bg-olive text-white shadow-sm'
+                    : 'border-border bg-paper text-ink hover:border-brass hover:bg-surface'
             }`}
         >
             <span>{category.label}</span>
             <span
-                className={`rounded-full px-2 py-0.5 text-xs ${
-                    isActive
-                        ? 'bg-[#ffc72c] text-[#21170f]'
-                        : 'bg-[#fff5d0] text-[#8a1116]'
+                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                    isActive ? 'bg-brass text-ink' : 'bg-surface text-wine'
                 }`}
             >
                 {category.count}
@@ -275,32 +271,32 @@ function ProductCard({
                     onOpen();
                 }
             }}
-            className="group grid cursor-pointer grid-rows-[160px_1fr] overflow-hidden rounded-md border-2 border-[#21170f] bg-white shadow-[5px_5px_0_#ffc72c] outline-none transition hover:-translate-y-0.5 hover:shadow-[7px_7px_0_#d71920] focus-visible:ring-4 focus-visible:ring-[#d71920]/35"
+            className="group grid cursor-pointer grid-rows-[160px_1fr] overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition outline-none hover:-translate-y-0.5 hover:border-brass hover:shadow-md focus-visible:ring-4 focus-visible:ring-wine/20"
         >
-            <div className="relative overflow-hidden bg-[#fff0bb]">
+            <div className="relative overflow-hidden bg-paper">
                 <img
                     src={food.image_url}
                     alt={food.name}
                     className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                     loading="lazy"
                 />
-                <span className="absolute top-3 left-3 rounded-full bg-white px-3 py-1 text-xs font-black text-[#8a1116] shadow">
+                <span className="absolute top-3 left-3 rounded-full border border-white/70 bg-surface/95 px-3 py-1 text-xs font-semibold text-olive shadow-sm backdrop-blur-sm">
                     {food.category_label}
                 </span>
             </div>
 
             <div className="flex min-h-56 flex-col gap-3 p-4">
                 <div className="flex flex-1 flex-col gap-2">
-                    <h2 className="text-lg leading-tight font-black">
+                    <h2 className="text-lg leading-tight font-semibold">
                         {food.name}
                     </h2>
-                    <p className="line-clamp-2 text-sm leading-5 text-[#66513d]">
+                    <p className="line-clamp-2 text-sm leading-5 text-muted">
                         {food.ingredients}
                     </p>
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
-                    <p className="text-base font-black text-[#d71920]">
+                    <p className="text-base font-semibold text-wine">
                         {food.formatted_price}
                     </p>
                     <button
@@ -309,7 +305,7 @@ function ProductCard({
                             event.stopPropagation();
                             onOpen();
                         }}
-                        className="rounded-md border-2 border-[#21170f] px-3 py-1 text-sm font-black hover:bg-[#ffc72c]"
+                        className="rounded-full border border-border px-3 py-1 text-sm font-semibold text-olive transition hover:border-brass hover:bg-paper focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
                     >
                         View
                     </button>
@@ -335,7 +331,7 @@ function QuantityStepper({
     onDecrement: () => void;
 }) {
     return (
-        <div className="grid h-11 grid-cols-[44px_1fr_44px] overflow-hidden rounded-md border-2 border-[#21170f] bg-[#fff9e8]">
+        <div className="grid h-11 grid-cols-[44px_1fr_44px] overflow-hidden rounded-full border border-border bg-paper">
             <button
                 type="button"
                 aria-label="Decrease quantity"
@@ -344,11 +340,11 @@ function QuantityStepper({
                     event.stopPropagation();
                     onDecrement();
                 }}
-                className="text-xl font-black disabled:cursor-not-allowed disabled:text-[#b7a68d] enabled:hover:bg-[#ffc72c]"
+                className="grid place-items-center text-lg font-semibold text-olive transition focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none enabled:hover:bg-brass/25 disabled:cursor-not-allowed disabled:text-border"
             >
                 -
             </button>
-            <div className="flex items-center justify-center border-x-2 border-[#21170f] text-sm font-black">
+            <div className="flex items-center justify-center border-x border-border text-sm font-semibold">
                 {quantity}
             </div>
             <button
@@ -358,7 +354,7 @@ function QuantityStepper({
                     event.stopPropagation();
                     onIncrement();
                 }}
-                className="text-xl font-black hover:bg-[#ffc72c]"
+                className="grid place-items-center text-lg font-semibold text-olive transition hover:bg-brass/25 focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
             >
                 +
             </button>
@@ -383,16 +379,16 @@ function ProductModal({
         <div
             role="presentation"
             onClick={onClose}
-            className="fixed inset-0 z-50 flex items-end bg-black/55 p-3 sm:items-center sm:justify-center"
+            className="fixed inset-0 z-50 flex items-end bg-ink/60 p-3 backdrop-blur-sm sm:items-center sm:justify-center"
         >
             <section
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="product-modal-title"
                 onClick={(event) => event.stopPropagation()}
-                className="grid max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-md border-2 border-[#21170f] bg-white shadow-[8px_8px_0_#ffc72c] sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1fr)]"
+                className="grid max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-lg border border-border bg-surface shadow-2xl sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1fr)]"
             >
-                <div className="h-64 bg-[#fff0bb] sm:h-full">
+                <div className="h-64 bg-paper sm:h-full">
                     <img
                         src={food.image_url}
                         alt={food.name}
@@ -403,12 +399,12 @@ function ProductModal({
                 <div className="flex flex-col gap-4 p-5">
                     <div className="flex items-start justify-between gap-4">
                         <div>
-                            <p className="text-xs font-black tracking-[0.16em] text-[#8a1116] uppercase">
+                            <p className="text-xs font-semibold tracking-[0.16em] text-olive uppercase">
                                 {food.category_label}
                             </p>
                             <h2
                                 id="product-modal-title"
-                                className="mt-1 text-2xl leading-tight font-black"
+                                className="mt-1 text-2xl leading-tight font-semibold"
                             >
                                 {food.name}
                             </h2>
@@ -417,18 +413,16 @@ function ProductModal({
                             type="button"
                             aria-label="Close details"
                             onClick={onClose}
-                            className="grid h-10 w-10 shrink-0 place-items-center rounded-md border-2 border-[#21170f] text-xl font-black hover:bg-[#ffc72c]"
+                            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border bg-paper text-olive transition hover:border-brass hover:text-wine focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
                         >
-                            x
+                            <CloseIcon />
                         </button>
                     </div>
 
-                    <p className="leading-6 text-[#66513d]">
-                        {food.ingredients}
-                    </p>
+                    <p className="leading-6 text-muted">{food.ingredients}</p>
 
                     <div className="mt-auto flex flex-col gap-4">
-                        <div className="rounded-md bg-[#d71920] px-4 py-3 text-xl font-black text-white">
+                        <div className="rounded-lg border border-wine/15 bg-wine px-4 py-3 text-xl font-semibold text-white shadow-sm">
                             {food.formatted_price}
                         </div>
                         <QuantityStepper
@@ -460,23 +454,23 @@ function CartDrawer({
         <div
             role="presentation"
             onClick={onClose}
-            className="fixed inset-0 z-50 flex justify-end bg-black/55"
+            className="fixed inset-0 z-50 flex justify-end bg-ink/60 backdrop-blur-sm"
         >
             <section
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="cart-drawer-title"
                 onClick={(event) => event.stopPropagation()}
-                className="flex h-full w-full max-w-md flex-col border-l-2 border-[#21170f] bg-white shadow-[-8px_0_0_#ffc72c]"
+                className="flex h-full w-full max-w-md flex-col border-l border-border bg-surface shadow-2xl"
             >
-                <div className="flex items-start justify-between gap-4 border-b-2 border-[#21170f] bg-[#ffc72c] p-4">
+                <div className="flex items-start justify-between gap-4 border-b border-border bg-paper p-4">
                     <div>
-                        <p className="text-xs font-black tracking-[0.16em] text-[#8a1116] uppercase">
+                        <p className="text-xs font-semibold tracking-[0.16em] text-olive uppercase">
                             Current order
                         </p>
                         <h2
                             id="cart-drawer-title"
-                            className="mt-1 text-2xl leading-tight font-black"
+                            className="mt-1 text-2xl leading-tight font-semibold"
                         >
                             Cart
                         </h2>
@@ -485,9 +479,9 @@ function CartDrawer({
                         type="button"
                         aria-label="Close cart"
                         onClick={onClose}
-                        className="grid h-10 w-10 shrink-0 place-items-center rounded-md border-2 border-[#21170f] bg-white text-xl font-black hover:bg-[#fff5d0]"
+                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border bg-surface text-olive transition hover:border-brass hover:text-wine focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
                     >
-                        x
+                        <CloseIcon />
                     </button>
                 </div>
 
@@ -497,18 +491,18 @@ function CartDrawer({
                             {items.map(({ food, quantity }) => (
                                 <article
                                     key={food.id}
-                                    className="rounded-md border-2 border-[#21170f] bg-[#fff9e8] p-3"
+                                    className="rounded-lg border border-border bg-paper p-3 shadow-sm"
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
-                                            <h3 className="font-black leading-tight">
+                                            <h3 className="leading-tight font-semibold">
                                                 {food.name}
                                             </h3>
-                                            <p className="mt-1 text-xs font-bold text-[#8a1116]">
+                                            <p className="mt-1 text-xs font-semibold text-olive">
                                                 Unit: {food.formatted_price}
                                             </p>
                                         </div>
-                                        <p className="shrink-0 text-sm font-black text-[#d71920]">
+                                        <p className="shrink-0 text-sm font-semibold text-wine">
                                             {formatVnd(
                                                 food.price_vnd * quantity,
                                             )}
@@ -525,7 +519,7 @@ function CartDrawer({
                                                 onDecrement(food.id)
                                             }
                                         />
-                                        <div className="flex items-center justify-between gap-3 text-xs font-bold text-[#66513d]">
+                                        <div className="flex items-center justify-between gap-3 text-xs font-semibold text-muted">
                                             <span>Quantity: {quantity}</span>
                                             <span>
                                                 Line total:{' '}
@@ -542,25 +536,25 @@ function CartDrawer({
                 ) : (
                     <div className="flex flex-1 items-center justify-center p-6 text-center">
                         <div className="max-w-64">
-                            <div className="mx-auto grid h-14 w-14 place-items-center rounded-md border-2 border-[#21170f] bg-[#fff9e8] text-[#d71920]">
+                            <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-border bg-paper text-wine shadow-sm">
                                 <CartIcon />
                             </div>
-                            <p className="mt-4 text-lg font-black">
+                            <p className="mt-4 text-lg font-semibold">
                                 Your cart is empty
                             </p>
-                            <p className="mt-2 text-sm leading-5 text-[#66513d]">
+                            <p className="mt-2 text-sm leading-5 text-muted">
                                 Add foods from the menu to see them here.
                             </p>
                         </div>
                     </div>
                 )}
 
-                <div className="border-t-2 border-[#21170f] bg-[#fff9e8] p-4">
+                <div className="border-t border-border bg-paper p-4">
                     <div className="flex items-center justify-between gap-4">
-                        <span className="text-sm font-black tracking-[0.14em] text-[#8a1116] uppercase">
+                        <span className="text-sm font-semibold tracking-[0.14em] text-olive uppercase">
                             Total
                         </span>
-                        <span className="text-xl font-black text-[#d71920]">
+                        <span className="text-xl font-semibold text-wine">
                             {formatVnd(totalVnd)}
                         </span>
                     </div>
@@ -585,6 +579,24 @@ function CartIcon() {
             <path d="M6 6h15l-1.5 8.5H8L6 3H3" />
             <path d="M8 19.5h.01" />
             <path d="M18 19.5h.01" />
+        </svg>
+    );
+}
+
+function CloseIcon() {
+    return (
+        <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+        >
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
         </svg>
     );
 }
