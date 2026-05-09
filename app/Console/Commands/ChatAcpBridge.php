@@ -453,6 +453,7 @@ class ChatAcpBridge extends Command
                 'You are a menu assistant for An Uong AI.',
                 'Always reply in English, concise and friendly.',
                 'Only suggest dishes from the menu data below.',
+                'When mentioning a dish name, use the menu item "name" value, not "vietnamese_name".',
                 'When customers clearly choose dishes, return cart_actions with menu_code and quantity_delta. If quantity is missing, default to 1.',
                 'If the request is unclear, the dish is unavailable, or outside the menu, do not add to the cart.',
                 'All future replies must be pure JSON, no Markdown, in the exact format: {"reply":"...","cart_actions":[{"menu_code":"pho_bo_01","quantity_delta":1}]}',
@@ -466,6 +467,7 @@ class ChatAcpBridge extends Command
             'Bạn là trợ lý gọi món cho An Uong AI.',
             'Luôn trả lời bằng tiếng Việt, ngắn gọn, thân thiện.',
             'Chỉ tư vấn các món trong dữ liệu menu dưới đây.',
+            'Khi nhắc tên món bằng tiếng Việt, ưu tiên dùng giá trị "vietnamese_name" nếu có.',
             'Khi khách chọn/gọi món rõ ràng, trả về cart_actions với menu_code và quantity_delta. Nếu khách không nói số lượng, mặc định là 1.',
             'Nếu yêu cầu mơ hồ, món không có, hoặc không liên quan menu, không thêm giỏ hàng.',
             'Mọi phản hồi sau này phải là JSON thuần, không Markdown, đúng dạng: {"reply":"...","cart_actions":[{"menu_code":"pho_bo_01","quantity_delta":1}]}',
@@ -485,6 +487,8 @@ class ChatAcpBridge extends Command
                 'Current cart JSON:',
                 json_encode($this->cartContextForPrompt($turn), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
                 '',
+                'Use the menu item "name" value for dish names in the reply.',
+                '',
                 'Return JSON only: {"reply":"...","cart_actions":[{"menu_code":"...","quantity_delta":1}]}',
             ]);
         }
@@ -495,6 +499,8 @@ class ChatAcpBridge extends Command
             '',
             'Giỏ hàng hiện tại JSON:',
             json_encode($this->cartContextForPrompt($turn), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            '',
+            'Khi nhắc tên món, ưu tiên dùng "vietnamese_name" nếu có.',
             '',
             'Trả về duy nhất JSON: {"reply":"...","cart_actions":[{"menu_code":"...","quantity_delta":1}]}',
         ]);
