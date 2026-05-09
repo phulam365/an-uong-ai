@@ -103,7 +103,7 @@ export default function Menu({ categories, foods }: MenuProps) {
                                 </h1>
                             </div>
                             <div className="rounded-md bg-[#21170f] px-4 py-2 text-sm font-bold text-white">
-                                {selectedCount} selected
+                                {selectedCount}
                             </div>
                         </div>
 
