@@ -42,15 +42,6 @@ export default function Menu({ categories, foods }: MenuProps) {
         [activeCategory, foods],
     );
 
-    const selectedCount = useMemo(
-        () =>
-            Object.values(quantities).reduce(
-                (total, quantity) => total + quantity,
-                0,
-            ),
-        [quantities],
-    );
-
     const cartItems = useMemo<CartItem[]>(
         () =>
             foods
@@ -134,12 +125,6 @@ export default function Menu({ categories, foods }: MenuProps) {
                                 >
                                     <CartIcon />
                                 </button>
-                                <span
-                                    aria-label={`${selectedCount} selected foods`}
-                                    className="rounded-full bg-wine px-3 py-2 text-sm font-semibold whitespace-nowrap text-white shadow-sm"
-                                >
-                                    {selectedCount}
-                                </span>
                             </div>
                         </div>
 
