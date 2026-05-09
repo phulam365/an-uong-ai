@@ -93,6 +93,11 @@ export default function Menu({ categories, foods }: MenuProps) {
         [cartItems],
     );
 
+    const cartQuantity = useMemo(
+        () => cartItems.reduce((total, item) => total + item.quantity, 0),
+        [cartItems],
+    );
+
     useEffect(() => {
         if (!selectedFood && !isCartOpen) {
             return;
@@ -154,11 +159,22 @@ export default function Menu({ categories, foods }: MenuProps) {
                                 />
                                 <button
                                     type="button"
-                                    aria-label="Open cart"
+                                    aria-label={
+                                        cartQuantity > 0
+                                            ? `Open cart, ${cartQuantity} items`
+                                            : 'Open cart'
+                                    }
                                     onClick={() => setIsCartOpen(true)}
-                                    className="grid h-11 w-11 place-items-center rounded-full border border-border bg-paper text-olive shadow-sm transition hover:-translate-y-0.5 hover:border-brass hover:text-olive-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
+                                    className="relative grid h-11 w-11 place-items-center rounded-full border border-border bg-paper text-olive shadow-sm transition hover:-translate-y-0.5 hover:border-brass hover:text-olive-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
                                 >
                                     <CartIcon />
+                                    {cartQuantity > 0 ? (
+                                        <span className="absolute -top-1.5 -right-1.5 grid min-h-5 min-w-5 place-items-center rounded-full border-2 border-surface bg-wine px-1 text-[11px] leading-none font-semibold text-white">
+                                            {cartQuantity > 99
+                                                ? '99+'
+                                                : cartQuantity}
+                                        </span>
+                                    ) : null}
                                 </button>
                             </div>
                         </div>
@@ -218,6 +234,7 @@ export default function Menu({ categories, foods }: MenuProps) {
                     items={cartItems}
                     language={language}
                     totalVnd={cartTotalVnd}
+                    cartQuantity={cartQuantity}
                     onClose={() => setIsCartOpen(false)}
                     onIncrement={(foodId) => updateQuantity(foodId, 1)}
                     onDecrement={(foodId) => updateQuantity(foodId, -1)}
@@ -256,7 +273,9 @@ function MenuChat({
     onCartAction: (foodId: number, quantityDelta: number) => void;
 }) {
     const [isOpen, setIsOpen] = useState(false);
-    const hasStartedSession = useRef(false);
+    const hasBootstrappedSession = useRef(false);
+    const sessionLanguage = useRef<MenuLanguage | null>(null);
+    const [isSessionReady, setIsSessionReady] = useState(false);
     const [input, setInput] = useState('');
     const [isSending, setIsSending] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>([
@@ -268,23 +287,50 @@ function MenuChat({
     ]);
 
     useEffect(() => {
-        if (!isOpen || hasStartedSession.current) {
+        if (!isOpen || hasBootstrappedSession.current) {
             return;
         }
 
-        hasStartedSession.current = true;
+        hasBootstrappedSession.current = true;
 
-        postJson(ChatSessionController.url(), { language }).catch(() => {
-            setMessages((current) => [
-                ...current,
-                {
-                    id: createMessageId(),
-                    role: 'assistant',
-                    text: 'Mình chưa mở được phiên chat. Vui lòng thử lại.',
-                },
-            ]);
-        });
+        const requestedLanguage = language;
+
+        void postJson(ChatSessionController.url(), {
+            language: requestedLanguage,
+        })
+            .then(() => {
+                sessionLanguage.current = requestedLanguage;
+                setIsSessionReady(true);
+            })
+            .catch(() => {
+                setMessages((current) => [
+                    ...current,
+                    {
+                        id: createMessageId(),
+                        role: 'assistant',
+                        text: 'Mình chưa mở được phiên chat. Vui lòng thử lại.',
+                    },
+                ]);
+            });
     }, [isOpen, language]);
+
+    useEffect(() => {
+        if (!isSessionReady || sessionLanguage.current === language) {
+            return;
+        }
+
+        const requestedLanguage = language;
+
+        void postJson(ChatSessionController.url(), {
+            language: requestedLanguage,
+        })
+            .then(() => {
+                sessionLanguage.current = requestedLanguage;
+            })
+            .catch(() => {
+                // Keep the menu responsive if a later language resync fails.
+            });
+    }, [isSessionReady, language]);
 
     const submitMessage = async (): Promise<void> => {
         const message = input.trim();
@@ -568,25 +614,6 @@ function ProductCard({
                     <p className="text-base font-semibold text-wine">
                         {food.formatted_price}
                     </p>
-                    <div className="grid grid-cols-2 gap-2">
-                        <button
-                            type="button"
-                            onClick={(event) => {
-                                event.stopPropagation();
-                                onOpen();
-                            }}
-                            className="rounded-full border border-border px-3 py-1.5 text-sm font-semibold text-olive transition hover:border-brass hover:bg-paper focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
-                        >
-                            View
-                        </button>
-                        <Link
-                            href={orderSuccess.url()}
-                            onClick={(event) => event.stopPropagation()}
-                            className="rounded-full border border-wine bg-wine px-3 py-1.5 text-center text-sm font-semibold text-white shadow-sm transition hover:border-wine-dark hover:bg-wine-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
-                        >
-                            Order
-                        </Link>
-                    </div>
                 </div>
 
                 <QuantityStepper
@@ -724,6 +751,7 @@ function CartDrawer({
     items,
     language,
     totalVnd,
+    cartQuantity,
     onClose,
     onIncrement,
     onDecrement,
@@ -731,6 +759,7 @@ function CartDrawer({
     items: CartItem[];
     language: MenuLanguage;
     totalVnd: number;
+    cartQuantity: number;
     onClose: () => void;
     onIncrement: (foodId: number) => void;
     onDecrement: (foodId: number) => void;
@@ -843,6 +872,15 @@ function CartDrawer({
                             {formatVnd(totalVnd)}
                         </span>
                     </div>
+                    {items.length > 0 ? (
+                        <Link
+                            href={orderSuccess.url()}
+                            className="mt-4 flex h-12 items-center justify-center rounded-full border border-wine bg-wine px-5 text-sm font-semibold text-white shadow-sm transition hover:border-wine-dark hover:bg-wine-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
+                        >
+                            Order {cartQuantity} item
+                            {cartQuantity === 1 ? '' : 's'}
+                        </Link>
+                    ) : null}
                 </div>
             </section>
         </div>

@@ -31,7 +31,7 @@ class FoodSeeder extends Seeder
         collect([
             [
                 'menu_code' => 'pho_bo_01',
-                'name' => 'Pho Bo',
+                'name' => 'Beef Pho',
                 'vietnamese_name' => 'Phở Bò',
                 'category' => FoodCategory::Food,
                 'description' => 'Traditional Vietnamese beef noodle soup with herbs and rice noodles',
@@ -70,7 +70,7 @@ class FoodSeeder extends Seeder
             ],
             [
                 'menu_code' => 'banh_mi_01',
-                'name' => 'Banh Mi',
+                'name' => 'Vietnamese Baguette Sandwich',
                 'vietnamese_name' => 'Bánh Mì',
                 'category' => FoodCategory::Food,
                 'description' => 'Vietnamese baguette sandwich with meat and pickled vegetables',
@@ -109,7 +109,7 @@ class FoodSeeder extends Seeder
             ],
             [
                 'menu_code' => 'bun_bo_hue_01',
-                'name' => 'Bun Bo Hue',
+                'name' => 'Hue Beef Noodle Soup',
                 'vietnamese_name' => 'Bún Bò Huế',
                 'category' => FoodCategory::Food,
                 'description' => 'Spicy central Vietnamese beef noodle soup',
@@ -148,7 +148,7 @@ class FoodSeeder extends Seeder
             ],
             [
                 'menu_code' => 'mi_quang_01',
-                'name' => 'Mi Quang',
+                'name' => 'Quang-Style Turmeric Noodles',
                 'vietnamese_name' => 'Mì Quảng',
                 'category' => FoodCategory::Food,
                 'description' => 'Central Vietnamese turmeric noodles with herbs, peanuts, and pork broth',
@@ -187,7 +187,7 @@ class FoodSeeder extends Seeder
             ],
             [
                 'menu_code' => 'com_tam_01',
-                'name' => 'Com Tam',
+                'name' => 'Broken Rice with Grilled Pork',
                 'vietnamese_name' => 'Cơm Tấm',
                 'category' => FoodCategory::Food,
                 'description' => 'Broken rice served with grilled pork, egg, and fish sauce',
@@ -226,7 +226,7 @@ class FoodSeeder extends Seeder
             ],
             [
                 'menu_code' => 'bun_cha_01',
-                'name' => 'Bun Cha',
+                'name' => 'Hanoi Grilled Pork with Vermicelli',
                 'vietnamese_name' => 'Bún Chả',
                 'category' => FoodCategory::Food,
                 'description' => 'Hanoi grilled pork with noodles, herbs, and dipping sauce',
@@ -265,7 +265,7 @@ class FoodSeeder extends Seeder
             ],
             [
                 'menu_code' => 'hu_tieu_01',
-                'name' => 'Hu Tieu',
+                'name' => 'Southern Vietnamese Noodle Soup',
                 'vietnamese_name' => 'Hủ Tiếu',
                 'category' => FoodCategory::Food,
                 'description' => 'Southern Vietnamese noodle soup with pork and seafood broth',
@@ -343,7 +343,7 @@ class FoodSeeder extends Seeder
             ],
             [
                 'menu_code' => 'bac_xiu_01',
-                'name' => 'Bac Xiu',
+                'name' => 'Vietnamese Sweet Milk Coffee',
                 'vietnamese_name' => 'Bạc Xỉu',
                 'category' => FoodCategory::Drink,
                 'description' => 'Sweet Vietnamese milk coffee with a lighter coffee flavor',
@@ -501,9 +501,10 @@ class FoodSeeder extends Seeder
             $food['ingredients'] = $food['description'];
 
             Food::updateOrCreate(
-                ['slug' => str($food['name'])->slug()->toString()],
+                ['menu_code' => $food['menu_code']],
                 [
                     ...$food,
+                    'slug' => str($food['name'])->slug()->toString(),
                     'is_available' => true,
                     'sort_order' => $index + 1,
                 ],
