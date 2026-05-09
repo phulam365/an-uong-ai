@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Food;
 
 use App\Enums\FoodCategory;
+use App\Enums\FoodTaste;
 use App\Filament\Resources\Food\Pages\CreateFood;
 use App\Filament\Resources\Food\Pages\EditFood;
 use App\Filament\Resources\Food\Pages\ListFood;
@@ -59,8 +60,27 @@ class FoodResource extends Resource
                     ->required()
                     ->native(false),
                 Textarea::make('ingredients')
+                    ->label('Ingredients JSON')
                     ->rows(4)
-                    ->dehydrateStateUsing(fn (?string $state): string => $state ?? '')
+                    ->formatStateUsing(fn (mixed $state): string => is_array($state) ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : (string) ($state ?? '[]'))
+                    ->dehydrateStateUsing(function (?string $state): array {
+                        $ingredients = json_decode($state ?: '[]', true);
+
+                        return is_array($ingredients) ? $ingredients : [];
+                    })
+                    ->columnSpanFull(),
+                Select::make('taste')
+                    ->options(FoodTaste::class)
+                    ->default(FoodTaste::Normal->value)
+                    ->required()
+                    ->native(false),
+                Textarea::make('how_made')
+                    ->label('How made')
+                    ->rows(3)
+                    ->columnSpanFull(),
+                Textarea::make('vietnamese_how_made')
+                    ->label('Vietnamese how made')
+                    ->rows(3)
                     ->columnSpanFull(),
                 TextInput::make('price_vnd')
                     ->label('Price')

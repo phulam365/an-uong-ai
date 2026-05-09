@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\FoodCategory;
 use App\MenuFilterDefinitions;
 use App\Models\ChatSession;
 use App\Models\ChatTurn;
@@ -16,7 +17,7 @@ use Throwable;
 #[Description('Run the local Codex ACP bridge for menu chat turns')]
 class ChatAcpBridge extends Command
 {
-    private const PROMPT_VERSION = 2;
+    private const PROMPT_VERSION = 4;
 
     /**
      * @var resource|null
@@ -92,7 +93,7 @@ class ChatAcpBridge extends Command
 
         $responseText = $this->prompt(
             $acpSessionId,
-            $this->buildTurnPrompt($turn),
+            $this->buildTurnPrompt($turn, $replyLanguage),
             (int) $this->option('turn-timeout'),
         );
         $rawResponse = $this->decodeJsonEnvelope($responseText, $replyLanguage);
@@ -514,10 +515,10 @@ class ChatAcpBridge extends Command
             'You are a bilingual menu assistant for An Uong AI.',
             'Infer the reply language from the customer latest message on every turn. English message -> English reply. Vietnamese message -> Vietnamese reply. Mixed message -> use the dominant language in that latest message.',
             'Do not rely on a stored chat language. The same chat session can switch between English and Vietnamese without being restarted.',
-            'Only suggest dishes and filters from the menu and allowed filter data below.',
+            'Only suggest dishes and filters from the menu and allowed filter data included in each turn.',
             'The menu data intentionally does not include slugs. Never mention, invent, or expose food slugs.',
-            'When replying in English and mentioning dishes, use the menu item "name" value.',
-            'When replying in Vietnamese and mentioning dishes, prefer "vietnamese_name" when present.',
+            'Each turn includes menu item names, ingredient names, taste labels, preparation text, and filter labels only in the inferred reply language.',
+            'Use the provided localized menu item "name" value when mentioning dishes.',
             'When mentioning a dish name in the reply string, wrap the visible dish name in double asterisks, for example **Beef Pho**.',
             'When listing ingredients in the reply string, put each ingredient on its own line.',
             'When customers clearly choose dishes, return cart_actions with menu_code and quantity_delta. If quantity is missing, default to 1. If the request is unclear, unavailable, or outside the menu, do not add to the cart.',
@@ -532,57 +533,63 @@ class ChatAcpBridge extends Command
             'Customer: món gì ăn sáng được? -> display_action type show_items with title and breakfast menu_codes.',
             'Customer: show healthy food -> display_action type show_items with title and matching healthy menu_codes.',
             'Customer: hiện món thanh nhẹ -> display_action type show_items with title and matching healthy menu_codes.',
-            'All future replies must be pure JSON, with no Markdown outside the JSON. The reply string may use **bold dish names**. Use the exact format: {"reply":"...","cart_actions":[{"menu_code":"pho_bo_01","quantity_delta":1}],"filter_action":null,"display_action":null}',
+            'All future replies must be exactly one pure JSON object, with no Markdown outside the JSON and no second JSON object. The reply string may use **bold dish names**. Use the exact format: {"reply":"...","cart_actions":[{"menu_code":"pho_bo_01","quantity_delta":1}],"filter_action":null,"display_action":null}',
             'filter_action shape when present: {"category":"food","property_keys":["healthy"]}',
             'display_action shape when present: {"type":"show_items","title":"Breakfast picks","menu_codes":["pho_bo_01","hu_tieu_01"]}',
-            '',
-            'ALLOWED_FILTERS_JSON:',
-            $this->allowedFiltersJson(),
-            '',
-            'MENU_JSON:',
-            $this->menuJson(),
         ]);
     }
 
-    private function buildTurnPrompt(ChatTurn $turn): string
+    private function buildTurnPrompt(ChatTurn $turn, string $replyLanguage): string
     {
         return implode("\n", [
+            'Detected reply language:',
+            $replyLanguage === 'en' ? 'English' : 'Vietnamese',
+            '',
             'Customer latest message:',
             $turn->user_message,
             '',
             'Current cart JSON:',
-            json_encode($this->cartContextForPrompt($turn), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            json_encode($this->cartContextForPrompt($turn, $replyLanguage), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             '',
             'Current filter JSON:',
-            json_encode($this->filterContextForPrompt($turn), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            json_encode($this->filterContextForPrompt($turn, $replyLanguage), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            '',
+            'ALLOWED_FILTERS_JSON:',
+            $this->allowedFiltersJson($replyLanguage),
+            '',
+            'MENU_JSON:',
+            $this->menuJson($replyLanguage),
             '',
             'Infer reply language from the customer latest message only.',
             'Never mention, invent, or expose food slugs.',
-            'English reply: use "name" for dish names. Vietnamese reply: prefer "vietnamese_name" for dish names.',
+            'Use only the localized "name" values provided in MENU_JSON for visible dish names.',
+            'Use localized ingredient names, taste labels, preparation text, cart item names, and filter labels from the JSON above.',
             'When mentioning dish names in the reply string, wrap each visible dish name in double asterisks, for example **Beef Pho**.',
             'When listing ingredients in the reply string, put each ingredient on its own line.',
             'Explicit ordering belongs in cart_actions.',
             'Explicit category switches belong in filter_action with allowed category/property_keys.',
-            'Recommendations, searches, preferences, dietary needs, flavor, ingredients, caffeine, or time-of-day suggestions belong in display_action with menu_codes in best-match order.',
+            'Recommendations, searches, preferences, dietary needs, flavor, ingredients, caffeine, or time-of-day suggestions belong in display_action with menu_codes in best-match order and a localized title.',
             'Do not use display_action for add-to-cart requests. Do not use filter_action for recommendation/search result grids.',
             '',
-            'Return JSON only: {"reply":"...","cart_actions":[{"menu_code":"...","quantity_delta":1}],"filter_action":null,"display_action":null}',
+            'Return exactly one JSON object only: {"reply":"...","cart_actions":[{"menu_code":"...","quantity_delta":1}],"filter_action":null,"display_action":null}',
         ]);
     }
 
-    private function menuJson(): string
+    private function menuJson(string $language): string
     {
         return Food::query()
             ->availableForMenu()
             ->get()
             ->map(fn (Food $food): array => [
                 'menu_code' => $food->menu_code,
-                'name' => $food->name,
-                'vietnamese_name' => $food->vietnamese_name,
+                'name' => $this->localizedFoodName($food, $language),
                 'category' => $food->category->value,
-                'description' => $food->description,
-                'vietnamese_description' => $food->vietnamese_description,
-                'ingredients' => $food->ingredients,
+                'category_label' => $this->localizedText($food->category->labels(), $language),
+                'description' => $this->localizedFoodDescription($food, $language),
+                'ingredients' => $this->localizedIngredients($food, $language),
+                'taste' => $food->taste->value,
+                'taste_label' => $this->localizedText($food->taste->labels(), $language),
+                'how_made' => $this->localizedHowMade($food, $language),
                 'price_vnd' => $food->price_vnd,
                 'subcategory' => $food->subcategory,
                 'protein' => $food->protein,
@@ -606,18 +613,30 @@ class ChatAcpBridge extends Command
             ->toJson(JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     }
 
-    private function allowedFiltersJson(): string
+    private function allowedFiltersJson(string $language): string
     {
         return json_encode([
-            'categories' => MenuFilterDefinitions::categoryKeys(),
-            'property_filters' => MenuFilterDefinitions::propertyFilters(),
+            'categories' => collect(FoodCategory::cases())
+                ->map(fn (FoodCategory $category): array => [
+                    'key' => $category->value,
+                    'label' => $this->localizedText($category->labels(), $language),
+                ])
+                ->values()
+                ->all(),
+            'property_filters' => collect(MenuFilterDefinitions::propertyFilters())
+                ->map(fn (array $filter): array => [
+                    'key' => $filter['key'],
+                    'label' => $this->localizedText($filter['labels'], $language),
+                ])
+                ->values()
+                ->all(),
         ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     }
 
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function cartContextForPrompt(ChatTurn $turn): array
+    private function cartContextForPrompt(ChatTurn $turn, string $language): array
     {
         $cart = collect($turn->cart_context ?? []);
         $foods = Food::query()
@@ -626,7 +645,7 @@ class ChatAcpBridge extends Command
             ->keyBy('id');
 
         return $cart
-            ->map(function (array $item) use ($foods): ?array {
+            ->map(function (array $item) use ($foods, $language): ?array {
                 $food = $foods->get((int) $item['food_id']);
 
                 if (! $food instanceof Food) {
@@ -635,8 +654,7 @@ class ChatAcpBridge extends Command
 
                 return [
                     'menu_code' => $food->menu_code,
-                    'name' => $food->name,
-                    'vietnamese_name' => $food->vietnamese_name,
+                    'name' => $this->localizedFoodName($food, $language),
                     'quantity' => (int) $item['quantity'],
                 ];
             })
@@ -646,24 +664,119 @@ class ChatAcpBridge extends Command
     }
 
     /**
-     * @return array{category: string|null, property_keys: array<int, string>}
+     * @return array{category: string|null, category_label: string|null, property_keys: array<int, string>, property_labels: array<int, string>}
      */
-    private function filterContextForPrompt(ChatTurn $turn): array
+    private function filterContextForPrompt(ChatTurn $turn, string $language): array
     {
         $filterContext = is_array($turn->filter_context) ? $turn->filter_context : [];
         $category = $filterContext['category'] ?? null;
         $propertyKeys = $filterContext['property_keys'] ?? [];
         $allowedPropertyKeys = MenuFilterDefinitions::propertyKeys();
+        $validatedCategory = is_string($category) && in_array($category, MenuFilterDefinitions::categoryKeys(), true) ? $category : null;
+        $validatedPropertyKeys = is_array($propertyKeys)
+            ? array_values(array_filter(
+                $propertyKeys,
+                fn (mixed $key): bool => is_string($key) && in_array($key, $allowedPropertyKeys, true),
+            ))
+            : [];
 
         return [
-            'category' => is_string($category) && in_array($category, MenuFilterDefinitions::categoryKeys(), true) ? $category : null,
-            'property_keys' => is_array($propertyKeys)
-                ? array_values(array_filter(
-                    $propertyKeys,
-                    fn (mixed $key): bool => is_string($key) && in_array($key, $allowedPropertyKeys, true),
-                ))
-                : [],
+            'category' => $validatedCategory,
+            'category_label' => $this->categoryLabel($validatedCategory, $language),
+            'property_keys' => $validatedPropertyKeys,
+            'property_labels' => $this->propertyLabels($validatedPropertyKeys, $language),
         ];
+    }
+
+    private function localizedFoodName(Food $food, string $language): string
+    {
+        if ($language === 'en') {
+            return $food->name;
+        }
+
+        return $food->vietnamese_name ?: $food->name;
+    }
+
+    private function localizedFoodDescription(Food $food, string $language): ?string
+    {
+        if ($language === 'en') {
+            return $food->description;
+        }
+
+        return $food->vietnamese_description ?: $food->description;
+    }
+
+    private function localizedHowMade(Food $food, string $language): ?string
+    {
+        if ($language === 'en') {
+            return $food->how_made;
+        }
+
+        return $food->vietnamese_how_made ?: $food->how_made;
+    }
+
+    /**
+     * @return array<int, array{name: string, quantity_grams: int}>
+     */
+    private function localizedIngredients(Food $food, string $language): array
+    {
+        $ingredients = is_array($food->ingredients) ? $food->ingredients : [];
+
+        return collect($ingredients)
+            ->filter(fn (mixed $ingredient): bool => is_array($ingredient))
+            ->map(fn (array $ingredient): array => [
+                'name' => $language === 'en'
+                    ? (string) ($ingredient['name'] ?? '')
+                    : (string) ($ingredient['vietnamese_name'] ?? $ingredient['name'] ?? ''),
+                'quantity_grams' => (int) ($ingredient['quantity_grams'] ?? 0),
+            ])
+            ->filter(fn (array $ingredient): bool => $ingredient['name'] !== '' && $ingredient['quantity_grams'] > 0)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array{en: string, vi: string}  $labels
+     */
+    private function localizedText(array $labels, string $language): string
+    {
+        return $labels[$language] ?? $labels['en'];
+    }
+
+    private function categoryLabel(?string $categoryKey, string $language): ?string
+    {
+        if ($categoryKey === null) {
+            return null;
+        }
+
+        $category = FoodCategory::tryFrom($categoryKey);
+
+        return $category instanceof FoodCategory
+            ? $this->localizedText($category->labels(), $language)
+            : null;
+    }
+
+    /**
+     * @param  array<int, string>  $propertyKeys
+     * @return array<int, string>
+     */
+    private function propertyLabels(array $propertyKeys, string $language): array
+    {
+        $filtersByKey = collect(MenuFilterDefinitions::propertyFilters())->keyBy('key');
+
+        return collect($propertyKeys)
+            ->map(function (string $propertyKey) use ($filtersByKey, $language): ?string {
+                $filter = $filtersByKey->get($propertyKey);
+
+                if (! is_array($filter)) {
+                    return null;
+                }
+
+                return $this->localizedText($filter['labels'], $language);
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /**
@@ -680,8 +793,8 @@ class ChatAcpBridge extends Command
             return $decoded;
         }
 
-        if (preg_match('/\{.*\}/s', $json, $matches) === 1) {
-            $decoded = json_decode($matches[0], true);
+        foreach ($this->jsonObjectCandidates($json) as $candidate) {
+            $decoded = json_decode($candidate, true);
 
             if (is_array($decoded)) {
                 return $decoded;
@@ -694,6 +807,79 @@ class ChatAcpBridge extends Command
             'filter_action' => null,
             'display_action' => null,
         ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function jsonObjectCandidates(string $text): array
+    {
+        $candidates = [];
+        $start = null;
+        $depth = 0;
+        $inString = false;
+        $isEscaped = false;
+        $length = strlen($text);
+
+        for ($index = 0; $index < $length; $index++) {
+            $character = $text[$index];
+
+            if ($start === null) {
+                if ($character === '{') {
+                    $start = $index;
+                    $depth = 1;
+                    $inString = false;
+                    $isEscaped = false;
+                }
+
+                continue;
+            }
+
+            if ($inString) {
+                if ($isEscaped) {
+                    $isEscaped = false;
+
+                    continue;
+                }
+
+                if ($character === '\\') {
+                    $isEscaped = true;
+
+                    continue;
+                }
+
+                if ($character === '"') {
+                    $inString = false;
+                }
+
+                continue;
+            }
+
+            if ($character === '"') {
+                $inString = true;
+
+                continue;
+            }
+
+            if ($character === '{') {
+                $depth++;
+
+                continue;
+            }
+
+            if ($character !== '}') {
+                continue;
+            }
+
+            $depth--;
+
+            if ($depth === 0) {
+                $candidates[] = substr($text, $start, $index - $start + 1);
+                $start = null;
+            }
+        }
+
+        return $candidates;
     }
 
     /**

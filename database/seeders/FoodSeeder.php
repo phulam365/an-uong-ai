@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Enums\FoodCategory;
+use App\Enums\FoodTaste;
 use App\Models\Food;
 use Illuminate\Database\Seeder;
 
@@ -450,7 +451,10 @@ class FoodSeeder extends Seeder
                 'image_path' => 'menu/sugarcane-juice.png',
             ],
         ])->each(function (array $food, int $index): void {
-            $food['ingredients'] = $food['description'];
+            $food = [
+                ...$food,
+                ...$this->localizedMenuDetails()[$food['menu_code']],
+            ];
 
             Food::updateOrCreate(
                 ['menu_code' => $food['menu_code']],
@@ -462,5 +466,156 @@ class FoodSeeder extends Seeder
                 ],
             );
         });
+    }
+
+    /**
+     * @return array<string, array{
+     *     ingredients: array<int, array{name: string, vietnamese_name: string, quantity_grams: int}>,
+     *     taste: FoodTaste,
+     *     how_made: string,
+     *     vietnamese_how_made: string
+     * }>
+     */
+    private function localizedMenuDetails(): array
+    {
+        return [
+            'pho_bo_01' => [
+                'ingredients' => [
+                    ['name' => 'Rice noodles', 'vietnamese_name' => 'Bánh phở', 'quantity_grams' => 180],
+                    ['name' => 'Beef', 'vietnamese_name' => 'Thịt bò', 'quantity_grams' => 90],
+                    ['name' => 'Beef broth', 'vietnamese_name' => 'Nước dùng bò', 'quantity_grams' => 350],
+                    ['name' => 'Fresh herbs', 'vietnamese_name' => 'Rau thơm', 'quantity_grams' => 20],
+                    ['name' => 'Bean sprouts', 'vietnamese_name' => 'Giá đỗ', 'quantity_grams' => 35],
+                ],
+                'taste' => FoodTaste::Normal,
+                'how_made' => 'Beef bones and aromatics are simmered into broth, then poured over rice noodles, sliced beef, herbs, and sprouts.',
+                'vietnamese_how_made' => 'Xương bò và gia vị được hầm thành nước dùng rồi chan lên bánh phở, thịt bò, rau thơm và giá.',
+            ],
+            'banh_mi_01' => [
+                'ingredients' => [
+                    ['name' => 'Baguette', 'vietnamese_name' => 'Bánh mì', 'quantity_grams' => 95],
+                    ['name' => 'Pork', 'vietnamese_name' => 'Thịt heo', 'quantity_grams' => 80],
+                    ['name' => 'Pate', 'vietnamese_name' => 'Pa tê', 'quantity_grams' => 25],
+                    ['name' => 'Pickled vegetables', 'vietnamese_name' => 'Đồ chua', 'quantity_grams' => 45],
+                    ['name' => 'Cucumber and herbs', 'vietnamese_name' => 'Dưa leo và rau thơm', 'quantity_grams' => 30],
+                ],
+                'taste' => FoodTaste::Normal,
+                'how_made' => 'A crisp baguette is split and filled with pate, pork, pickles, cucumber, herbs, and savory sauce.',
+                'vietnamese_how_made' => 'Bánh mì giòn được kẹp pa tê, thịt heo, đồ chua, dưa leo, rau thơm và nước sốt mặn mà.',
+            ],
+            'bun_bo_hue_01' => [
+                'ingredients' => [
+                    ['name' => 'Round rice noodles', 'vietnamese_name' => 'Bún sợi to', 'quantity_grams' => 190],
+                    ['name' => 'Beef', 'vietnamese_name' => 'Thịt bò', 'quantity_grams' => 100],
+                    ['name' => 'Spicy lemongrass broth', 'vietnamese_name' => 'Nước dùng sả cay', 'quantity_grams' => 380],
+                    ['name' => 'Fresh herbs', 'vietnamese_name' => 'Rau thơm', 'quantity_grams' => 25],
+                    ['name' => 'Chili oil', 'vietnamese_name' => 'Dầu ớt', 'quantity_grams' => 10],
+                ],
+                'taste' => FoodTaste::Spicy,
+                'how_made' => 'A rich beef and lemongrass broth is seasoned with chili oil and served with noodles, beef, and herbs.',
+                'vietnamese_how_made' => 'Nước dùng bò sả được nêm dầu ớt rồi dùng với bún, thịt bò và rau thơm.',
+            ],
+            'mi_quang_01' => [
+                'ingredients' => [
+                    ['name' => 'Turmeric rice noodles', 'vietnamese_name' => 'Mì nghệ', 'quantity_grams' => 180],
+                    ['name' => 'Pork', 'vietnamese_name' => 'Thịt heo', 'quantity_grams' => 85],
+                    ['name' => 'Pork broth', 'vietnamese_name' => 'Nước dùng heo', 'quantity_grams' => 180],
+                    ['name' => 'Fresh herbs', 'vietnamese_name' => 'Rau sống', 'quantity_grams' => 35],
+                    ['name' => 'Peanuts', 'vietnamese_name' => 'Đậu phộng', 'quantity_grams' => 15],
+                ],
+                'taste' => FoodTaste::Normal,
+                'how_made' => 'Turmeric noodles are topped with pork, herbs, peanuts, and a small ladle of concentrated broth.',
+                'vietnamese_how_made' => 'Mì nghệ được xếp cùng thịt heo, rau sống, đậu phộng và một ít nước dùng đậm vị.',
+            ],
+            'com_tam_01' => [
+                'ingredients' => [
+                    ['name' => 'Broken rice', 'vietnamese_name' => 'Cơm tấm', 'quantity_grams' => 220],
+                    ['name' => 'Grilled pork', 'vietnamese_name' => 'Sườn nướng', 'quantity_grams' => 120],
+                    ['name' => 'Egg', 'vietnamese_name' => 'Trứng', 'quantity_grams' => 55],
+                    ['name' => 'Fish sauce dressing', 'vietnamese_name' => 'Nước mắm', 'quantity_grams' => 35],
+                    ['name' => 'Pickled vegetables', 'vietnamese_name' => 'Đồ chua', 'quantity_grams' => 40],
+                ],
+                'taste' => FoodTaste::Normal,
+                'how_made' => 'Broken rice is steamed and plated with marinated grilled pork, egg, pickles, and fish sauce dressing.',
+                'vietnamese_how_made' => 'Cơm tấm được hấp chín rồi dọn cùng sườn nướng ướp vị, trứng, đồ chua và nước mắm.',
+            ],
+            'bun_cha_01' => [
+                'ingredients' => [
+                    ['name' => 'Rice vermicelli', 'vietnamese_name' => 'Bún', 'quantity_grams' => 190],
+                    ['name' => 'Grilled pork', 'vietnamese_name' => 'Thịt heo nướng', 'quantity_grams' => 120],
+                    ['name' => 'Dipping sauce', 'vietnamese_name' => 'Nước chấm', 'quantity_grams' => 120],
+                    ['name' => 'Fresh herbs', 'vietnamese_name' => 'Rau thơm', 'quantity_grams' => 35],
+                    ['name' => 'Pickled vegetables', 'vietnamese_name' => 'Đồ chua', 'quantity_grams' => 30],
+                ],
+                'taste' => FoodTaste::Normal,
+                'how_made' => 'Pork patties and slices are grilled, then served with vermicelli, herbs, pickles, and warm dipping sauce.',
+                'vietnamese_how_made' => 'Chả và thịt heo được nướng thơm rồi dùng với bún, rau thơm, đồ chua và nước chấm ấm.',
+            ],
+            'hu_tieu_01' => [
+                'ingredients' => [
+                    ['name' => 'Rice noodles', 'vietnamese_name' => 'Sợi hủ tiếu', 'quantity_grams' => 180],
+                    ['name' => 'Pork', 'vietnamese_name' => 'Thịt heo', 'quantity_grams' => 75],
+                    ['name' => 'Seafood broth', 'vietnamese_name' => 'Nước dùng hải sản', 'quantity_grams' => 350],
+                    ['name' => 'Shrimp', 'vietnamese_name' => 'Tôm', 'quantity_grams' => 45],
+                    ['name' => 'Fresh herbs', 'vietnamese_name' => 'Rau thơm', 'quantity_grams' => 25],
+                ],
+                'taste' => FoodTaste::Normal,
+                'how_made' => 'Clear pork and seafood broth is ladled over noodles with pork, shrimp, and fresh herbs.',
+                'vietnamese_how_made' => 'Nước dùng trong từ heo và hải sản được chan lên hủ tiếu cùng thịt heo, tôm và rau thơm.',
+            ],
+            'ca_phe_sua_da_01' => [
+                'ingredients' => [
+                    ['name' => 'Dark coffee', 'vietnamese_name' => 'Cà phê đen', 'quantity_grams' => 80],
+                    ['name' => 'Condensed milk', 'vietnamese_name' => 'Sữa đặc', 'quantity_grams' => 35],
+                    ['name' => 'Ice', 'vietnamese_name' => 'Đá', 'quantity_grams' => 140],
+                ],
+                'taste' => FoodTaste::Sweet,
+                'how_made' => 'Dark coffee is brewed through a phin over condensed milk, stirred, and poured over ice.',
+                'vietnamese_how_made' => 'Cà phê đậm được pha phin trên sữa đặc, khuấy đều rồi rót lên đá.',
+            ],
+            'bac_xiu_01' => [
+                'ingredients' => [
+                    ['name' => 'Milk', 'vietnamese_name' => 'Sữa tươi', 'quantity_grams' => 140],
+                    ['name' => 'Condensed milk', 'vietnamese_name' => 'Sữa đặc', 'quantity_grams' => 35],
+                    ['name' => 'Dark coffee', 'vietnamese_name' => 'Cà phê đen', 'quantity_grams' => 45],
+                    ['name' => 'Ice', 'vietnamese_name' => 'Đá', 'quantity_grams' => 130],
+                ],
+                'taste' => FoodTaste::Sweet,
+                'how_made' => 'Milk and condensed milk are mixed with a small pour of strong coffee and served over ice.',
+                'vietnamese_how_made' => 'Sữa tươi và sữa đặc được pha với một phần cà phê đậm rồi dùng với đá.',
+            ],
+            'tra_sua_tran_chau_01' => [
+                'ingredients' => [
+                    ['name' => 'Milk tea', 'vietnamese_name' => 'Trà sữa', 'quantity_grams' => 260],
+                    ['name' => 'Tapioca pearls', 'vietnamese_name' => 'Trân châu', 'quantity_grams' => 70],
+                    ['name' => 'Syrup', 'vietnamese_name' => 'Siro đường', 'quantity_grams' => 25],
+                    ['name' => 'Ice', 'vietnamese_name' => 'Đá', 'quantity_grams' => 120],
+                ],
+                'taste' => FoodTaste::Sweet,
+                'how_made' => 'Tea is blended with milk and syrup, shaken with ice, and served with chewy tapioca pearls.',
+                'vietnamese_how_made' => 'Trà được pha với sữa và siro, lắc cùng đá rồi dùng với trân châu dai.',
+            ],
+            'matcha_latte_01' => [
+                'ingredients' => [
+                    ['name' => 'Milk', 'vietnamese_name' => 'Sữa tươi', 'quantity_grams' => 230],
+                    ['name' => 'Matcha', 'vietnamese_name' => 'Bột matcha', 'quantity_grams' => 5],
+                    ['name' => 'Syrup', 'vietnamese_name' => 'Siro đường', 'quantity_grams' => 25],
+                    ['name' => 'Ice', 'vietnamese_name' => 'Đá', 'quantity_grams' => 120],
+                ],
+                'taste' => FoodTaste::Sweet,
+                'how_made' => 'Matcha is whisked smooth, mixed with milk and light syrup, and served cold over ice.',
+                'vietnamese_how_made' => 'Matcha được khuấy mịn, pha với sữa và siro nhẹ rồi dùng lạnh với đá.',
+            ],
+            'nuoc_mia_01' => [
+                'ingredients' => [
+                    ['name' => 'Fresh sugarcane juice', 'vietnamese_name' => 'Nước mía tươi', 'quantity_grams' => 300],
+                    ['name' => 'Kumquat juice', 'vietnamese_name' => 'Nước tắc', 'quantity_grams' => 15],
+                    ['name' => 'Ice', 'vietnamese_name' => 'Đá', 'quantity_grams' => 130],
+                ],
+                'taste' => FoodTaste::Sweet,
+                'how_made' => 'Sugarcane is pressed fresh, brightened with kumquat juice, and served immediately over ice.',
+                'vietnamese_how_made' => 'Mía được ép tươi, thêm chút tắc cho thơm rồi dùng ngay với đá.',
+            ],
+        ];
     }
 }

@@ -1,4 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
+import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     show as showChatMessage,
@@ -26,13 +27,24 @@ interface Food {
     slug: string;
     category: string;
     category_labels: LocalizedText;
-    ingredients: string;
+    description: string | null;
     vietnamese_description: string | null;
+    ingredients: Ingredient[];
+    taste: 'normal' | 'sweet' | 'spicy';
+    taste_labels: LocalizedText;
+    how_made: string | null;
+    vietnamese_how_made: string | null;
     formatted_price: string;
     price_vnd: number;
     image_url: string;
     property_keys: string[];
     property_labels: LocalizedText[];
+}
+
+interface Ingredient {
+    name: string;
+    vietnamese_name: string;
+    quantity_grams: number;
 }
 
 interface MenuProps {
@@ -128,6 +140,10 @@ const uiText: Record<
         chatNoResponse: string;
         chatTimeout: string;
         chatTimeoutError: string;
+        ingredients: string;
+        taste: string;
+        howMade: string;
+        grams: string;
     }
 > = {
     vi: {
@@ -172,6 +188,10 @@ const uiText: Record<
         chatNoResponse: 'Mình chưa có phản hồi phù hợp.',
         chatTimeout: 'Mình vẫn đang chờ kết nối trợ lý. Vui lòng thử lại sau.',
         chatTimeoutError: 'Quá thời gian chờ phản hồi từ trợ lý.',
+        ingredients: 'Thành phần',
+        taste: 'Khẩu vị',
+        howMade: 'Cách làm',
+        grams: 'g',
     },
     en: {
         pageTitle: 'Menu',
@@ -220,6 +240,10 @@ const uiText: Record<
         chatTimeout:
             'I am still waiting for the assistant connection. Please try again later.',
         chatTimeoutError: 'Timed out waiting for the assistant response.',
+        ingredients: 'Ingredients',
+        taste: 'Taste',
+        howMade: 'How It Is Made',
+        grams: 'g',
     },
 };
 
@@ -355,13 +379,13 @@ export default function Menu({
             <Head title={t.pageTitle} />
             <main className="min-h-screen bg-paper text-ink">
                 <div className="border-b border-border bg-surface/95 shadow-sm">
-                    <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:px-8">
-                        <div className="flex items-center justify-between gap-4">
+                    <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8">
+                        <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
                                 <img
                                     src="/logo.webp"
                                     alt={t.heroTitle}
-                                    className="h-20 w-auto max-w-[min(70vw,480px)] object-contain sm:h-24"
+                                    className="h-16 w-auto max-w-[min(70vw,480px)] object-contain sm:h-20"
                                 />
                             </div>
 
@@ -378,7 +402,7 @@ export default function Menu({
                                             : t.openCart
                                     }
                                     onClick={() => setIsCartOpen(true)}
-                                    className="relative grid h-11 w-11 place-items-center rounded-full border border-border bg-paper text-olive shadow-sm transition hover:-translate-y-0.5 hover:border-brass hover:text-olive-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
+                                    className="relative grid h-10 w-10 place-items-center rounded-full border border-border bg-paper text-olive shadow-sm transition hover:-translate-y-0.5 hover:border-brass hover:text-olive-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
                                 >
                                     <CartIcon />
                                     {cartItemCount > 0 ? (
@@ -764,7 +788,7 @@ function LanguageSwitch({
     return (
         <div
             aria-label={t.menuLanguage}
-            className="grid h-11 grid-cols-2 overflow-hidden rounded-full border border-border bg-paper p-1 shadow-sm"
+            className="grid h-10 grid-cols-2 overflow-hidden rounded-full border border-border bg-paper p-0.5 shadow-sm"
             role="group"
         >
             {(['vi', 'en'] as const).map((option) => (
@@ -773,7 +797,7 @@ function LanguageSwitch({
                     type="button"
                     aria-pressed={language === option}
                     onClick={() => onChange(option)}
-                    className={`min-w-11 rounded-full px-3 text-sm font-semibold transition focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none ${
+                    className={`min-w-10 rounded-full px-2.5 text-sm font-semibold transition focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none ${
                         language === option
                             ? 'bg-olive text-white shadow-sm'
                             : 'text-olive hover:bg-surface'
@@ -977,7 +1001,7 @@ function ProductModal({
                 aria-modal="true"
                 aria-labelledby="product-modal-title"
                 onClick={(event) => event.stopPropagation()}
-                className="grid max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-lg border border-border bg-surface shadow-2xl sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1fr)]"
+                className="grid h-[92vh] w-full max-w-3xl overflow-hidden rounded-lg border border-border bg-surface shadow-2xl sm:h-[min(760px,92vh)] sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1fr)]"
             >
                 <div className="h-64 bg-paper sm:h-full">
                     <img
@@ -987,7 +1011,7 @@ function ProductModal({
                     />
                 </div>
 
-                <div className="flex flex-col gap-4 p-5">
+                <div className="flex min-h-0 flex-col gap-4 overflow-y-auto p-5">
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="text-xs font-semibold tracking-[0.16em] text-olive uppercase">
@@ -1025,6 +1049,42 @@ function ProductModal({
                         </div>
                     ) : null}
 
+                    <div className="grid gap-4">
+                        <DetailSection title={t.ingredients}>
+                            <ul className="grid gap-2">
+                                {food.ingredients.map((ingredient) => (
+                                    <li
+                                        key={`${ingredient.name}-${ingredient.quantity_grams}`}
+                                        className="flex items-center justify-between gap-3 rounded-lg border border-border bg-paper px-3 py-2 text-sm"
+                                    >
+                                        <span className="font-semibold">
+                                            {getIngredientName(
+                                                ingredient,
+                                                language,
+                                            )}
+                                        </span>
+                                        <span className="shrink-0 text-muted">
+                                            {ingredient.quantity_grams}
+                                            {t.grams}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </DetailSection>
+
+                        <DetailSection title={t.taste}>
+                            <span className="inline-flex w-fit rounded-full border border-brass/60 bg-brass/20 px-3 py-1 text-sm font-semibold text-olive">
+                                {localizedText(food.taste_labels, language)}
+                            </span>
+                        </DetailSection>
+
+                        <DetailSection title={t.howMade}>
+                            <p className="text-sm leading-6 text-muted">
+                                {getFoodHowMade(food, language)}
+                            </p>
+                        </DetailSection>
+                    </div>
+
                     <div className="mt-auto flex flex-col gap-4">
                         <div className="rounded-lg border border-wine/15 bg-wine px-4 py-3 text-xl font-semibold text-white shadow-sm">
                             {food.formatted_price}
@@ -1039,6 +1099,23 @@ function ProductModal({
                 </div>
             </section>
         </div>
+    );
+}
+
+function DetailSection({
+    title,
+    children,
+}: {
+    title: string;
+    children: ReactNode;
+}) {
+    return (
+        <section className="grid gap-2">
+            <h3 className="text-xs font-semibold tracking-[0.14em] text-olive uppercase">
+                {title}
+            </h3>
+            {children}
+        </section>
     );
 }
 
@@ -1270,10 +1347,29 @@ function getFoodName(food: Food, language: MenuLanguage): string {
 
 function getFoodDescription(food: Food, language: MenuLanguage): string {
     if (language === 'en') {
-        return food.ingredients;
+        return food.description || '';
     }
 
-    return food.vietnamese_description || food.ingredients;
+    return food.vietnamese_description || food.description || '';
+}
+
+function getFoodHowMade(food: Food, language: MenuLanguage): string {
+    if (language === 'en') {
+        return food.how_made || '';
+    }
+
+    return food.vietnamese_how_made || food.how_made || '';
+}
+
+function getIngredientName(
+    ingredient: Ingredient,
+    language: MenuLanguage,
+): string {
+    if (language === 'en') {
+        return ingredient.name;
+    }
+
+    return ingredient.vietnamese_name || ingredient.name;
 }
 
 function localizedText(labels: LocalizedText, language: MenuLanguage): string {

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\FoodCategory;
+use App\Enums\FoodTaste;
 use Database\Factories\FoodFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
@@ -20,6 +21,9 @@ use Illuminate\Database\Eloquent\Model;
     'vietnamese_name',
     'description',
     'vietnamese_description',
+    'taste',
+    'how_made',
+    'vietnamese_how_made',
     'subcategory',
     'protein',
     'cooking_style',
@@ -57,6 +61,7 @@ class Food extends Model
 
     protected $attributes = [
         'category' => 'food',
+        'taste' => 'normal',
         'is_available' => true,
         'sort_order' => 0,
     ];
@@ -86,6 +91,8 @@ class Food extends Model
     {
         return [
             'category' => FoodCategory::class,
+            'ingredients' => 'array',
+            'taste' => FoodTaste::class,
             'price_vnd' => 'integer',
             'sweetness' => 'integer',
             'spiciness' => 'integer',
