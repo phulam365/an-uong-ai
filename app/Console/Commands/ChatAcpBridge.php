@@ -12,7 +12,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Throwable;
 
-#[Signature('chat:acp-bridge {--idle-timeout=900} {--poll=1} {--turn-timeout=90} {--standby-without-key}')]
+#[Signature('chat:acp-bridge {--idle-timeout=900} {--poll=1} {--turn-timeout=90}')]
 #[Description('Run the local Codex ACP bridge for menu chat turns')]
 class ChatAcpBridge extends Command
 {
@@ -42,20 +42,6 @@ class ChatAcpBridge extends Command
      */
     public function handle(): int
     {
-        if (! $this->hasApiKey()) {
-            $this->error('Set CODEX_API_KEY or OPENAI_API_KEY before running chat:acp-bridge.');
-
-            if ($this->option('standby-without-key')) {
-                $this->warn('Chat ACP bridge is standing by without an API key. Restart after adding a key.');
-
-                while (true) {
-                    sleep(max((int) $this->option('poll'), 1));
-                }
-            }
-
-            return self::FAILURE;
-        }
-
         while (true) {
             $this->closeIdleSessions();
 
@@ -197,19 +183,18 @@ class ChatAcpBridge extends Command
             throw new \RuntimeException("Codex ACP binary was not found at {$binary}. Run npm install first.");
         }
 
-        File::ensureDirectoryExists($this->agentHomePath());
         File::ensureDirectoryExists(storage_path('app/private/chat-acp-workspaces'));
 
         $baseEnvironment = getenv();
-        $baseEnvironment = is_array($baseEnvironment) ? $baseEnvironment : [];
+        $environment = is_array($baseEnvironment) ? $baseEnvironment : [];
 
-        $environment = array_filter([
-            ...$baseEnvironment,
-            'CODEX_API_KEY' => config('services.codex_acp.codex_api_key'),
-            'OPENAI_API_KEY' => config('services.codex_acp.openai_api_key'),
-            'CODEX_HOME' => $this->agentHomePath(),
-            'HOME' => $this->agentHomePath(),
-        ], fn (mixed $value): bool => $value !== null && $value !== false);
+        if (filled(config('services.codex_acp.codex_api_key'))) {
+            $environment['CODEX_API_KEY'] = (string) config('services.codex_acp.codex_api_key');
+        }
+
+        if (filled(config('services.codex_acp.openai_api_key'))) {
+            $environment['OPENAI_API_KEY'] = (string) config('services.codex_acp.openai_api_key');
+        }
 
         $this->process = proc_open(
             $this->agentCommand($binary),
@@ -844,16 +829,5 @@ class ChatAcpBridge extends Command
         File::ensureDirectoryExists($path);
 
         return $path;
-    }
-
-    private function agentHomePath(): string
-    {
-        return storage_path('app/private/chat-acp-home');
-    }
-
-    private function hasApiKey(): bool
-    {
-        return filled(config('services.codex_acp.codex_api_key'))
-            || filled(config('services.codex_acp.openai_api_key'));
     }
 }

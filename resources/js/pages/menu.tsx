@@ -80,7 +80,6 @@ const uiText: Record<
     MenuLanguage,
     {
         pageTitle: string;
-        brandLabel: string;
         heroTitle: string;
         openCart: string;
         openCartWithItems: (count: number) => string;
@@ -124,7 +123,6 @@ const uiText: Record<
 > = {
     vi: {
         pageTitle: 'Thực đơn',
-        brandLabel: 'Thực đơn An Uong AI',
         heroTitle: 'Món ăn và đồ uống sẵn sàng để chọn',
         openCart: 'Mở giỏ hàng',
         openCartWithItems: (count) => `Mở giỏ hàng, ${count} món`,
@@ -168,7 +166,6 @@ const uiText: Record<
     },
     en: {
         pageTitle: 'Menu',
-        brandLabel: 'An Uong AI Menu',
         heroTitle: 'Food and drinks ready to browse',
         openCart: 'Open cart',
         openCartWithItems: (count) =>
@@ -207,7 +204,8 @@ const uiText: Record<
         chatTyping: 'Replying...',
         chatWelcome:
             'What would you like today? I can suggest dishes and add them to your cart.',
-        chatSessionError: 'I could not open the chat session. Please try again.',
+        chatSessionError:
+            'I could not open the chat session. Please try again.',
         chatSendError: 'I could not send the message. Please try again.',
         chatNoResponse: 'I do not have a useful response yet.',
         chatTimeout:
@@ -345,10 +343,7 @@ export default function Menu({
                     <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:px-8">
                         <div className="flex items-center justify-between gap-4">
                             <div>
-                                <p className="text-xs font-semibold tracking-[0.18em] text-olive uppercase">
-                                    {t.brandLabel}
-                                </p>
-                                <h1 className="mt-1 text-2xl leading-tight font-semibold sm:text-3xl">
+                                <h1 className="text-2xl leading-tight font-semibold sm:text-3xl">
                                     {t.heroTitle}
                                 </h1>
                             </div>
@@ -600,17 +595,16 @@ function MenuChat({
 
         hasBootstrappedSession.current = true;
 
-        void postJson(ChatSessionController.url())
-            .catch(() => {
-                setMessages((current) => [
-                    ...current,
-                    {
-                        id: createMessageId(),
-                        role: 'assistant',
-                        text: t.chatSessionError,
-                    },
-                ]);
-            });
+        void postJson(ChatSessionController.url()).catch(() => {
+            setMessages((current) => [
+                ...current,
+                {
+                    id: createMessageId(),
+                    role: 'assistant',
+                    text: t.chatSessionError,
+                },
+            ]);
+        });
     }, [isOpen, t.chatSessionError]);
 
     const submitMessage = async (): Promise<void> => {
@@ -663,7 +657,10 @@ function MenuChat({
         response: ChatTurnResponse,
     ): Promise<void> => {
         if (response.status === 'pending' || response.status === 'processing') {
-            const completedResponse = await pollTurn(response.turn_id, language);
+            const completedResponse = await pollTurn(
+                response.turn_id,
+                language,
+            );
             applyChatResponse(completedResponse);
 
             return;
@@ -678,10 +675,7 @@ function MenuChat({
             {
                 id: createMessageId(),
                 role: 'assistant',
-                text:
-                    response.reply ||
-                    response.error ||
-                    t.chatNoResponse,
+                text: response.reply || response.error || t.chatNoResponse,
             },
         ]);
 
@@ -782,7 +776,7 @@ function MenuChat({
                 <span className="relative grid h-6 w-6 shrink-0 place-items-center">
                     {isOpen ? <CloseIcon /> : <ChatIcon />}
                 </span>
-                <span className="relative whitespace-nowrap text-sm font-semibold">
+                <span className="relative text-sm font-semibold whitespace-nowrap">
                     {t.chatButtonCta}
                 </span>
             </button>

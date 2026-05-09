@@ -1,8 +1,9 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { home } from '@/routes';
 
 type OrderLanguage = 'vi' | 'en';
+const redirectDelaySeconds = 3;
 
 const orderSuccessText: Record<
     OrderLanguage,
@@ -10,7 +11,8 @@ const orderSuccessText: Record<
         pageTitle: string;
         kicker: string;
         title: string;
-        body: string;
+        body: (secondsRemaining: number) => string;
+        countdownLabel: string;
         backHome: string;
     }
 > = {
@@ -18,14 +20,20 @@ const orderSuccessText: Record<
         pageTitle: 'Đặt món thành công',
         kicker: 'Hoàn tất đặt món',
         title: 'Đơn của bạn đã được ghi nhận.',
-        body: 'Bạn sẽ được chuyển về trang chủ sau 3 giây.',
+        body: (secondsRemaining) =>
+            `Bạn sẽ được chuyển về trang chủ sau ${secondsRemaining} giây.`,
+        countdownLabel: 'Đếm ngược chuyển trang',
         backHome: 'Về trang chủ',
     },
     en: {
         pageTitle: 'Order Success',
         kicker: 'Order complete',
         title: 'Your order was placed successfully.',
-        body: 'You will be redirected back to the homepage in 3 seconds.',
+        body: (secondsRemaining) =>
+            `You will be redirected back to the homepage in ${secondsRemaining} ${
+                secondsRemaining === 1 ? 'second' : 'seconds'
+            }.`,
+        countdownLabel: 'Redirect countdown',
         backHome: 'Back to home',
     },
 };
@@ -36,15 +44,26 @@ export default function OrderSuccess({
     language?: OrderLanguage;
 }) {
     const t = orderSuccessText[language];
+    const [secondsRemaining, setSecondsRemaining] =
+        useState(redirectDelaySeconds);
 
     useEffect(() => {
+        const countdownTimer = window.setInterval(() => {
+            setSecondsRemaining((currentSeconds) =>
+                Math.max(currentSeconds - 1, 1),
+            );
+        }, 1000);
+
         const redirectTimer = window.setTimeout(() => {
             router.visit(home.url({ query: { language } }), {
                 replace: true,
             });
-        }, 3000);
+        }, redirectDelaySeconds * 1000);
 
-        return () => window.clearTimeout(redirectTimer);
+        return () => {
+            window.clearInterval(countdownTimer);
+            window.clearTimeout(redirectTimer);
+        };
     }, [language]);
 
     return (
@@ -62,8 +81,15 @@ export default function OrderSuccess({
                         {t.title}
                     </h1>
                     <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-muted">
-                        {t.body}
+                        {t.body(secondsRemaining)}
                     </p>
+                    <div
+                        className="mx-auto mt-5 grid h-14 w-14 place-items-center rounded-full border border-olive/20 bg-surface text-2xl font-semibold text-olive shadow-sm"
+                        aria-live="polite"
+                    >
+                        <span className="sr-only">{t.countdownLabel}</span>
+                        {secondsRemaining}
+                    </div>
                     <Link
                         href={home.url({ query: { language } })}
                         className="mt-8 inline-flex items-center justify-center rounded-full border border-wine bg-wine px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:border-wine-dark hover:bg-wine-dark focus-visible:ring-4 focus-visible:ring-wine/20 focus-visible:outline-none"
