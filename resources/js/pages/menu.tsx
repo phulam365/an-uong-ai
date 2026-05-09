@@ -568,6 +568,7 @@ function MenuChat({
     const t = uiText[language];
     const [isOpen, setIsOpen] = useState(false);
     const hasBootstrappedSession = useRef(false);
+    const messageListRef = useRef<HTMLDivElement | null>(null);
     const [input, setInput] = useState('');
     const [isSending, setIsSending] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>(() => [
@@ -592,6 +593,26 @@ function MenuChat({
             ]);
         });
     }, [isOpen, t.chatSessionError]);
+
+    useEffect(() => {
+        if (!isOpen || isSending) {
+            return;
+        }
+
+        const latestMessage = messages[messages.length - 1];
+
+        if (latestMessage?.role !== 'assistant') {
+            return;
+        }
+
+        const container = messageListRef.current;
+
+        if (!container) {
+            return;
+        }
+
+        container.scrollTop = container.scrollHeight;
+    }, [isOpen, isSending, messages]);
 
     const submitMessage = async (): Promise<void> => {
         const message = input.trim();
@@ -685,7 +706,7 @@ function MenuChat({
             {isOpen ? (
                 <section
                     aria-label={t.chatAssistantLabel}
-                    className="flex h-[520px] max-h-[calc(100vh-7rem)] w-[calc(100vw-2rem)] max-w-[380px] flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-2xl"
+                    className="flex h-[600px] max-h-[calc(100vh-7rem)] w-[calc(100vw-2rem)] max-w-[380px] flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-2xl"
                 >
                     <div className="flex items-center justify-between gap-3 border-b border-border bg-paper px-4 py-3">
                         <div className="min-w-0">
@@ -706,7 +727,10 @@ function MenuChat({
                         </button>
                     </div>
 
-                    <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-3">
+                    <div
+                        ref={messageListRef}
+                        className="flex flex-1 flex-col gap-3 overflow-y-auto p-3"
+                    >
                         {messages.map((message) => (
                             <div
                                 key={message.id}
